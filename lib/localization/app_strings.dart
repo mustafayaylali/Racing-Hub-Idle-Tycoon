@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show debugPrint;
 class AppStrings {
   AppStrings._();
 
+  static const String storeTitle = "Racing Hub: Idle Tycoon";
+
   // ─── Otantik Yarış Atı İsimleri Havuzu ───
   static const List<String> raceHorsePool = [
     'Thunderbolt', 'Silver Arrow', 'Desert Storm', 'Night Fury',
@@ -45,7 +47,7 @@ class AppStrings {
     // ══════════════════════════════════════
     'tr': {
       // Sekmeler
-      'tab_derby': 'Derby',
+      'tab_derby': 'Yarış',
       'tab_stable': 'Ahır',
       'tab_jockeys': 'Jokeyler',
       'tab_facilities': 'Tesis',

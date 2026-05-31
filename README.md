@@ -1,6 +1,6 @@
-# pawpital
+# Racing Hub: Idle Tycoon
 
-A new Flutter project.
+A horse racing idle tycoon game built in Flutter.
 
 ## Getting Started
 

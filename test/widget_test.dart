@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:pawpital/main.dart';
+import 'package:racinghub/main.dart';
 
 void main() {
   testWidgets('At yarışı oyunu smoke testi', (WidgetTester tester) async {
@@ -11,27 +11,26 @@ void main() {
     // Uygulamayı ProviderScope içinde başlat.
     await tester.pumpWidget(
       const ProviderScope(
-        child: PawpitalApp(),
+        child: RacingHubIdleTycoonApp(),
       ),
     );
 
-    // İlk frame'i işle (controller başlangıcı için)
-    await tester.pump(const Duration(milliseconds: 300));
+    // İlk frame + postFrameCallback işle
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 400));
 
     // Alt navigasyon çubuğu öğelerini doğrula (Türkçe isimler)
-    expect(find.text('Derby'), findsOneWidget);
-    expect(find.text('Ahır'), findsOneWidget);
+    expect(find.text('Yarış'), findsOneWidget);
+    // Tab 1/2 dinamik olarak aktif kategori adını gösterir (tier 0 = At Yarışı)
+    expect(find.text('Atlar'), findsOneWidget);
     expect(find.text('Jokeyler'), findsOneWidget);
     expect(find.text('Tesis'), findsOneWidget);
     expect(find.text('Market'), findsOneWidget);
 
-    // Derby sekmesinde aktif takım bilgisinin gösterildiğini doğrula
-    expect(find.text('D Klasmanı'), findsOneWidget);
+    // Derby sekmesinde aktif div bilgisinin gösterildiğini doğrula
+    expect(find.text('Yerel Amatör Kupası'), findsOneWidget);
 
-    // Boost butonunun mevcut olduğunu doğrula
-    expect(find.textContaining('2X Boost'), findsOneWidget);
-
-    // Canlı anlatım kutusunun varlığını doğrula
-    expect(find.textContaining('Hipodrom'), findsOneWidget);
+    // Canlı anlatım kutusu / Canlı rozetinin varlığını doğrula (CANLI/LIVE)
+    expect(find.text('CANLI'), findsOneWidget);
   });
 }

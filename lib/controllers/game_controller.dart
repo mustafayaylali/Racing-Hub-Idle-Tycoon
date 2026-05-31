@@ -1,15 +1,107 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:crypto/crypto.dart';
 import '../models/game_state_model.dart';
 import '../main.dart';
+
 
 class GameNotifier extends Notifier<GameStateModel> {
   Timer? _gameLoopTimer;
   int _tickCount = 0;
   final List<int> _finishedHorses = [];
   final Map<int, Map<String, dynamic>> _leagueStates = {};
+
+  DateTime _initialTrustedTime = DateTime.now();
+  final Stopwatch _sessionStopwatch = Stopwatch();
+  bool _isTimeTrusted = false;
+
+  bool get isTimeTrusted => _isTimeTrusted;
+
+  DateTime get _currentTrustedTime {
+    return _initialTrustedTime.add(_sessionStopwatch.elapsed);
+  }
+
+  Future<void> _fetchNetworkTime() async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(Uri.parse('https://clients3.google.com/generate_204'));
+      final response = await request.close();
+      final dateHeader = response.headers.value('date');
+      if (dateHeader != null) {
+        final parsedNetworkTime = HttpDate.parse(dateHeader);
+        final localTime = DateTime.now();
+        final diff = parsedNetworkTime.difference(localTime).inSeconds.abs();
+        
+        _initialTrustedTime = parsedNetworkTime;
+        _sessionStopwatch.reset();
+        _sessionStopwatch.start();
+        
+        if (diff > 60) {
+          _isTimeTrusted = false;
+          debugPrint("WARNING: Device clock is altered by $diff seconds! Network time used instead.");
+        } else {
+          _isTimeTrusted = true;
+        }
+      }
+    } catch (e) {
+      _isTimeTrusted = false;
+    }
+  }
+
+
+  String _calculateChecksum(String data) {
+    const String salt = "RacingHubPrivateSaltKey2026!";
+    final bytes = utf8.encode(data + salt);
+    return sha256.convert(bytes).toString();
+  }
+
+
+  List<Map<String, dynamic>> getDisciplineRanks() {
+    final List<Map<String, dynamic>> ranks = [];
+    for (int tier = 0; tier < CategoryConfig.categories.length; tier++) {
+      double seasonPoints = 0.0;
+      List<double> rivalSeasonPoints = [];
+      int classIndex = 0;
+
+      if (tier == state.leagueTier) {
+        seasonPoints = state.seasonPoints;
+        rivalSeasonPoints = state.rivalSeasonPoints;
+        classIndex = state.currentClassIndex;
+      } else {
+        final saved = _leagueStates[tier];
+        if (saved != null) {
+          seasonPoints = (saved['seasonPoints'] as num?)?.toDouble() ?? 0.0;
+          rivalSeasonPoints = (saved['rivalSeasonPoints'] as List?)?.cast<double>() ?? const [];
+          classIndex = saved['currentClassIndex'] as int? ?? 0;
+        } else {
+          seasonPoints = 0.0;
+          rivalSeasonPoints = const [];
+          classIndex = 0;
+        }
+      }
+
+      int rank = 1;
+      if (rivalSeasonPoints.isNotEmpty) {
+        rank = rivalSeasonPoints.where((rp) => rp > seasonPoints).length + 1;
+      }
+
+      ranks.add({
+        'tier': tier,
+        'nameTr': CategoryConfig.categories[tier].nameTr,
+        'nameEn': CategoryConfig.categories[tier].nameEn,
+        'emoji': CategoryConfig.categories[tier].asset1Emoji,
+        'rank': rank,
+        'points': seasonPoints,
+        'classIndex': classIndex,
+      });
+    }
+    return ranks;
+  }
 
   Duration get maxOfflineDuration => const Duration(hours: 2);
 
@@ -63,7 +155,8 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   double getHorseStatUpgradeCost(int tier, int level, String statId) {
     double baseGold = (statId == 'speed' || statId == 'stamina') ? 300.0 : 200.0;
-    return baseGold * _getLeagueModifier(tier) * math.pow(1.15, level);
+    int relativeLevel = math.max(0, level - 1);
+    return baseGold * _getLeagueModifier(tier) * math.pow(1.15, relativeLevel);
   }
 
   double getJockeySkillUpgradeCost(int tier, int level, String skillId) {
@@ -72,18 +165,10 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   String getDerbyName(int tier) {
-    const names = [
-      'Village League',
-      'City League',
-      'Regional League',
-      'National League',
-      'Elite League',
-      'Legendary League',
-    ];
-    if (tier < names.length) {
-      return names[tier];
+    if (tier >= 0 && tier < CategoryConfig.categories.length) {
+      return CategoryConfig.categories[tier].nameTr;
     }
-    return 'Legendary League';
+    return '🛥️ Deniz Yarışı';
   }
 
   DateTime? _lastDiskSaveTime;
@@ -106,11 +191,18 @@ class GameNotifier extends Notifier<GameStateModel> {
     }
     
     // Save lastSaved timestamp and full state to persistent storage, throttled to once every 5 seconds or immediately on critical changes
-    final now = DateTime.now();
+    final now = _currentTrustedTime;
     if (shouldSaveNow || _lastDiskSaveTime == null || now.difference(_lastDiskSaveTime!) > const Duration(seconds: 5)) {
       _lastDiskSaveTime = now;
       sharedPrefs.setString('last_saved_time', value.lastSaved.toIso8601String());
-      sharedPrefs.setString('game_state_json', jsonEncode(value.toJson()));
+      
+      final jsonStr = jsonEncode(value.toJson());
+      final checksum = _calculateChecksum(jsonStr);
+      final envelope = {
+        'data': jsonStr,
+        'checksum': checksum,
+      };
+      sharedPrefs.setString('game_state_json', jsonEncode(envelope));
       
       final Map<String, Map<String, dynamic>> serialized = _leagueStates.map(
         (key, val) => MapEntry(key.toString(), val),
@@ -123,9 +215,14 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   @override
   GameStateModel build() {
+    _initialTrustedTime = DateTime.now();
+    _sessionStopwatch.reset();
+    _sessionStopwatch.start();
+    _fetchNetworkTime();
+
     _startGameLoop();
 
-    final now = DateTime.now();
+    final now = _currentTrustedTime;
 
     // 1. Load league states first
     final String? leagueStatesStr = sharedPrefs.getString('league_states_json');
@@ -149,7 +246,21 @@ class GameNotifier extends Notifier<GameStateModel> {
     if (gameStateJson != null) {
       try {
         final decoded = jsonDecode(gameStateJson) as Map<String, dynamic>;
-        var loadedState = GameStateModel.fromJson(decoded);
+        GameStateModel loadedState;
+        if (decoded.containsKey('data') && decoded.containsKey('checksum')) {
+          final String dataStr = decoded['data'] as String;
+          final String expectedChecksum = decoded['checksum'] as String;
+          final String actualChecksum = _calculateChecksum(dataStr);
+          if (actualChecksum == expectedChecksum) {
+            final Map<String, dynamic> stateJson = jsonDecode(dataStr) as Map<String, dynamic>;
+            loadedState = GameStateModel.fromJson(stateJson);
+          } else {
+            throw Exception("Checksum mismatch - save data tampered!");
+          }
+        } else {
+          // older format fallback
+          loadedState = GameStateModel.fromJson(decoded);
+        }
         loadedState = loadedState.copyWith(
           goldPerSecond: _calculateGoldPerSecond(loadedState.buildings),
         );
@@ -239,6 +350,8 @@ class GameNotifier extends Notifier<GameStateModel> {
       offlineDurationSeconds: 0,
       seasonHistory: const [],
       seasonClassHistory: const [],
+      tickets: 2,
+      lastTicketClaimTime: DateTime.fromMillisecondsSinceEpoch(0),
     );
 
     return _applyOfflineProgress(initialState, now);
@@ -287,7 +400,7 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   void _tick() {
     _tickCount++;
-    final now = DateTime.now();
+    final now = _currentTrustedTime;
     final random = math.Random();
 
     // 1. Decrement boost time left every 10 ticks (1 second)
@@ -631,19 +744,6 @@ class GameNotifier extends Notifier<GameStateModel> {
     );
   }
 
-  /// At ismini yeniden adlandırır.
-  void renamePlayerHorse(int index, String newName) {
-    if (newName.trim().isEmpty || index < 0 || index >= state.horses.length) {
-      return;
-    }
-    final newHorses = List<HorseAsset>.from(state.horses);
-    newHorses[index] = newHorses[index].copyWith(name: newName.trim());
-    state = state.copyWith(
-      horses: newHorses,
-      hasChangedHorseName: true,
-      lastSaved: DateTime.now(),
-    );
-  }
 
   /// Çevrimdışı kazancı toplar. [doubled] = true ise reklam izlenerek 2 katı alınır.
   void collectOfflineGold({bool doubled = false}) {
@@ -652,13 +752,13 @@ class GameNotifier extends Notifier<GameStateModel> {
         gold: state.gold + state.pendingOfflineGold,
         pendingOfflineGold: 0.0,
         offlineDurationSeconds: 0,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
     } else {
       state = state.copyWith(
         pendingOfflineGold: 0.0,
         offlineDurationSeconds: 0,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
     }
   }
@@ -742,7 +842,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         horsePositions: List.filled(promoCount, 0.0),
         raceRanks: nextRanks,
         season: state.season + 1,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -765,7 +865,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       horsePositions: List.filled(cnt, 0.0),
       raceRanks: nextRanks,
       season: state.season + 1,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -861,7 +961,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       seasonClassHistory: const [],
       buildings: defaultBuildings,
       goldPerSecond: _calculateGoldPerSecond(defaultBuildings),
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -939,7 +1039,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         seasonClassHistory: const [],
         buildings: defaultBuildings,
         goldPerSecond: _calculateGoldPerSecond(defaultBuildings),
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -951,7 +1051,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       return false;
     }
     final horse = state.horses[horseIndex];
-    if (horse.associatedLeagueTier > state.leagueTier) {
+    if (horse.currentStars == 0.0) {
       return false; // Locked
     }
 
@@ -983,7 +1083,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         gold: state.gold - cost,
         horses: newHorses,
         winChance: newWinChance,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1027,47 +1127,236 @@ class GameNotifier extends Notifier<GameStateModel> {
         gold: state.gold - cost,
         jockeys: newJockeys,
         winChance: newWinChance,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
     return false;
   }
 
+  void _updateWinChance() {
+    final double newWinChance = _calculateWinChance(
+      state.horses,
+      state.jockeys,
+      state.leagueTier,
+      state.inventory,
+      state.equippedEquipment,
+      state.buildings,
+      classIdx: state.currentClassIndex,
+    );
+    state = state.copyWith(winChance: newWinChance);
+  }
+
   bool buyPremiumHorse(int tier) {
-    const int cost = 15; // 15 Diamonds
+    if (tier < 0 || tier >= state.horses.length) return false;
+    final cost = (tier + 1) * 30;
     if (state.diamonds >= cost) {
-      final random = math.Random();
-      final names = [
-        'Pegasus Elite', 'Shadow Legend', 'Golden Emperor', 
-        'Star Chaser', 'Midnight Mystic', 'Titan Legend', 
-        'Elmas Rüzgarı', 'Fırtına Pençesi'
-      ];
-      final name = names[random.nextInt(names.length)];
-      final newHorse = HorseAsset(
-        id: 'h_prem_${DateTime.now().microsecondsSinceEpoch}',
-        name: name,
-        associatedLeagueTier: tier,
-        currentStars: 5,
-        duplicateCardCount: 0,
-        stats: const {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
-        },
+      final oldHorse = state.horses[tier];
+      if (oldHorse.currentStars > 0) return false; // Already unlocked
+
+      final double starValue = tier == 7 ? 5.0 : 1.0 + tier * 0.5;
+      final newHorse = oldHorse.copyWith(
+        currentStars: starValue,
       );
-      final newHorses = List<HorseAsset>.from(state.horses)..add(newHorse);
+
+      final newHorses = List<HorseAsset>.from(state.horses);
+      newHorses[tier] = newHorse;
+
       state = state.copyWith(
         diamonds: state.diamonds - cost,
         horses: newHorses,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
+      _updateWinChance();
       return true;
     }
     return false;
+  }
+
+  int getNextNeededHorseTier() {
+    for (int i = 0; i < state.horses.length; i++) {
+      if (state.horses[i].currentStars == 0.0) {
+        return i;
+      }
+    }
+    return state.horses.length - 1;
+  }
+
+  void addHorseFragments(int tier, int amount) {
+    if (tier < 0 || tier >= state.horses.length) return;
+    final oldHorse = state.horses[tier];
+    int newFragments = oldHorse.duplicateCardCount + amount;
+    double newStars = oldHorse.currentStars;
+    
+    if (newStars == 0.0 && newFragments >= 20) {
+      newStars = tier == 7 ? 5.0 : 1.0 + tier * 0.5; // Unlock the horse AVD tier!
+    }
+    
+    final newHorse = oldHorse.copyWith(
+      duplicateCardCount: newFragments,
+      currentStars: newStars,
+    );
+    
+    final newHorses = List<HorseAsset>.from(state.horses);
+    newHorses[tier] = newHorse;
+    
+    state = state.copyWith(
+      horses: newHorses,
+      lastSaved: _currentTrustedTime,
+    );
+    _updateWinChance();
+  }
+
+  int getNormalBoxAdCounter() {
+    return sharedPrefs.getInt('normal_box_ad_count') ?? 0;
+  }
+
+  void resetNormalBoxAdCounter() {
+    sharedPrefs.setInt('normal_box_ad_count', 0);
+  }
+
+  Map<String, dynamic>? openNormalBoxAd() {
+    final currentCount = getNormalBoxAdCounter();
+    if (currentCount >= 3) return null;
+
+    final nextCount = currentCount + 1;
+    sharedPrefs.setInt('normal_box_ad_count', nextCount);
+
+    final nextTier = getNextNeededHorseTier();
+    addHorseFragments(nextTier, 1);
+
+    return {
+      'type': 'horse',
+      'tier': nextTier,
+      'amount': 1,
+      'name': state.horses[nextTier].name,
+      'counter': nextCount,
+    };
+  }
+
+  Map<String, dynamic>? openGoldBoxPremium() {
+    const cost = 30; // 30 Diamonds
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      
+      final rand = math.Random();
+      final roll = rand.nextInt(100);
+      
+      final currentNeededTier = getNextNeededHorseTier();
+      int selectedOffset = 0;
+      
+      if (roll < 5) {
+        selectedOffset = 4;
+      } else if (roll < 15) {
+        selectedOffset = 3;
+      } else if (roll < 30) {
+        selectedOffset = 2;
+      } else if (roll < 50) {
+        selectedOffset = 1;
+      } else {
+        selectedOffset = 0;
+      }
+      
+      int targetTier = currentNeededTier + selectedOffset;
+      if (targetTier >= state.horses.length) {
+        targetTier = state.horses.length - 1;
+      }
+      
+      final amount = 3 + rand.nextInt(3); 
+      addHorseFragments(targetTier, amount);
+      
+      return {
+        'type': 'horse',
+        'tier': targetTier,
+        'amount': amount,
+        'name': state.horses[targetTier].name,
+      };
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? openStandardChest1xTicket() {
+    if (state.tickets >= 1) {
+      state = state.copyWith(tickets: state.tickets - 1);
+      final rand = math.Random();
+      final tier = rand.nextInt(state.horses.length);
+      addHorseFragments(tier, 1);
+      return {
+        'type': 'horse',
+        'tier': tier,
+        'amount': 1,
+        'name': state.horses[tier].name,
+      };
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>>? openStandardChest10xDiamonds() {
+    const cost = 100;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final List<Map<String, dynamic>> drops = [];
+      final Map<int, int> tierDrops = {};
+      for (int i = 0; i < 10; i++) {
+        final tier = rand.nextInt(state.horses.length);
+        tierDrops[tier] = (tierDrops[tier] ?? 0) + 1;
+      }
+      tierDrops.forEach((tier, amount) {
+        addHorseFragments(tier, amount);
+        drops.add({
+          'type': 'horse',
+          'tier': tier,
+          'amount': amount,
+          'name': state.horses[tier].name,
+        });
+      });
+      return drops;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? openNadirChest1xDiamonds() {
+    const cost = 50;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final tier = 2 + rand.nextInt(state.horses.length - 2);
+      final amount = 3;
+      addHorseFragments(tier, amount);
+      return {
+        'type': 'horse',
+        'tier': tier,
+        'amount': amount,
+        'name': state.horses[tier].name,
+      };
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>>? openNadirChest10xDiamonds() {
+    const cost = 500;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final List<Map<String, dynamic>> drops = [];
+      final Map<int, int> tierDrops = {};
+      for (int i = 0; i < 10; i++) {
+        final tier = 2 + rand.nextInt(state.horses.length - 2);
+        tierDrops[tier] = (tierDrops[tier] ?? 0) + 3;
+      }
+      tierDrops.forEach((tier, amount) {
+        addHorseFragments(tier, amount);
+        drops.add({
+          'type': 'horse',
+          'tier': tier,
+          'amount': amount,
+          'name': state.horses[tier].name,
+        });
+      });
+      return drops;
+    }
+    return null;
   }
 
   bool buyPremiumJockey(int tier) {
@@ -1081,7 +1370,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       ];
       final name = names[random.nextInt(names.length)];
       final newJockey = JockeyAsset(
-        id: 'j_prem_${DateTime.now().microsecondsSinceEpoch}',
+        id: 'j_prem_${_currentTrustedTime.microsecondsSinceEpoch}',
         name: name,
         associatedLeagueTier: tier,
         currentStars: 5,
@@ -1096,7 +1385,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       state = state.copyWith(
         diamonds: state.diamonds - cost,
         jockeys: newJockeys,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1125,7 +1414,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     state = state.copyWith(
       horses: newHorses,
       winChance: newWinChance,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -1151,7 +1440,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     state = state.copyWith(
       jockeys: newJockeys,
       winChance: newWinChance,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -1180,7 +1469,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         buildings: newBuildings,
         goldPerSecond: newGoldPerSec,
         winChance: newWinChance,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1213,7 +1502,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     final random = math.Random();
     final bool isHorseCard = random.nextBool();
     String cardName = '';
-    int stars = 1;
+    double stars = 1.0;
 
     List<HorseAsset> newHorses = List.from(state.horses);
     List<JockeyAsset> newJockeys = List.from(state.jockeys);
@@ -1252,7 +1541,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       horses: newHorses,
       jockeys: newJockeys,
       winChance: newWinChance,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
 
     return {
@@ -1270,7 +1559,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       if (horse.duplicateCardCount >= 5) {
         final updatedHorse = horse.copyWith(
           duplicateCardCount: horse.duplicateCardCount - 5,
-          currentStars: horse.currentStars + 1,
+          currentStars: math.min(5.0, horse.currentStars + 0.5),
         );
         final newHorses = List<HorseAsset>.from(state.horses);
         newHorses[index] = updatedHorse;
@@ -1288,12 +1577,13 @@ class GameNotifier extends Notifier<GameStateModel> {
         state = state.copyWith(
           horses: newHorses,
           winChance: newWinChance,
-          lastSaved: DateTime.now(),
+          lastSaved: _currentTrustedTime,
         );
         return {
           'isHorse': true,
           'name': horse.name,
           'stars': updatedHorse.currentStars,
+          'tier': index,
         };
       }
     } else {
@@ -1301,7 +1591,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       if (jockey.duplicateCardCount >= 5) {
         final updatedJockey = jockey.copyWith(
           duplicateCardCount: jockey.duplicateCardCount - 5,
-          currentStars: jockey.currentStars + 1,
+          currentStars: math.min(5.0, jockey.currentStars + 0.5),
         );
         final newJockeys = List<JockeyAsset>.from(state.jockeys);
         newJockeys[index] = updatedJockey;
@@ -1319,16 +1609,163 @@ class GameNotifier extends Notifier<GameStateModel> {
         state = state.copyWith(
           jockeys: newJockeys,
           winChance: newWinChance,
-          lastSaved: DateTime.now(),
+          lastSaved: _currentTrustedTime,
         );
         return {
           'isHorse': false,
           'name': jockey.name,
           'stars': updatedJockey.currentStars,
+          'tier': index,
         };
       }
     }
     return null;
+  }
+
+  Map<String, dynamic>? openChestWithTicket(int chestTier, bool isHorse) {
+    if (state.tickets < 1) {
+      return null;
+    }
+
+    String cardName = '';
+    double stars = 1.0;
+
+    List<HorseAsset> newHorses = List.from(state.horses);
+    List<JockeyAsset> newJockeys = List.from(state.jockeys);
+
+    if (isHorse) {
+      final horse = state.horses[chestTier];
+      final updatedHorse = horse.copyWith(
+        duplicateCardCount: horse.duplicateCardCount + 1,
+      );
+      newHorses[chestTier] = updatedHorse;
+      cardName = horse.name;
+      stars = horse.currentStars;
+    } else {
+      final jockey = state.jockeys[chestTier];
+      final updatedJockey = jockey.copyWith(
+        duplicateCardCount: jockey.duplicateCardCount + 1,
+      );
+      newJockeys[chestTier] = updatedJockey;
+      cardName = jockey.name;
+      stars = jockey.currentStars;
+    }
+
+    final double newWinChance = _calculateWinChance(
+      newHorses,
+      newJockeys,
+      state.leagueTier,
+      state.inventory,
+      state.equippedEquipment,
+      state.buildings,
+      classIdx: state.currentClassIndex,
+    );
+
+    state = state.copyWith(
+      tickets: state.tickets - 1,
+      horses: newHorses,
+      jockeys: newJockeys,
+      winChance: newWinChance,
+      lastSaved: _currentTrustedTime,
+    );
+
+    return {
+      'isHorse': isHorse,
+      'name': cardName,
+      'tier': chestTier,
+      'stars': stars,
+    };
+  }
+
+  bool claimFreeTicket() {
+    final now = _currentTrustedTime;
+    final diff = now.difference(state.lastTicketClaimTime);
+    if (diff >= const Duration(seconds: 30)) {
+      state = state.copyWith(
+        tickets: state.tickets + 1,
+        lastTicketClaimTime: now,
+        lastSaved: now,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  void claimAdTicket() {
+    state = state.copyWith(
+      tickets: state.tickets + 1,
+      lastSaved: _currentTrustedTime,
+    );
+  }
+
+  void buyDiamondsBundle(int amount) {
+    state = state.copyWith(
+      diamonds: state.diamonds + amount,
+      lastSaved: _currentTrustedTime,
+    );
+  }
+
+  bool buyCardPack(bool isGold) {
+    if (isGold) {
+      const double cost = 5000.0;
+      if (state.gold >= cost) {
+        List<HorseAsset> newHorses = List.from(state.horses);
+        List<JockeyAsset> newJockeys = List.from(state.jockeys);
+        final random = math.Random();
+        for (int i = 0; i < 5; i++) {
+          final isHorseCard = random.nextBool();
+          final int tier = random.nextInt(state.leagueTier + 1);
+          if (isHorseCard) {
+            final horse = state.horses[tier];
+            newHorses[tier] = horse.copyWith(
+              duplicateCardCount: horse.duplicateCardCount + 1,
+            );
+          } else {
+            final jockey = state.jockeys[tier];
+            newJockeys[tier] = jockey.copyWith(
+              duplicateCardCount: jockey.duplicateCardCount + 1,
+            );
+          }
+        }
+        state = state.copyWith(
+          gold: state.gold - cost,
+          horses: newHorses,
+          jockeys: newJockeys,
+          lastSaved: _currentTrustedTime,
+        );
+        return true;
+      }
+    } else {
+      const int cost = 20;
+      if (state.diamonds >= cost) {
+        List<HorseAsset> newHorses = List.from(state.horses);
+        List<JockeyAsset> newJockeys = List.from(state.jockeys);
+        final random = math.Random();
+        for (int i = 0; i < 5; i++) {
+          final isHorseCard = random.nextBool();
+          final int tier = random.nextInt(state.leagueTier + 1);
+          if (isHorseCard) {
+            final horse = state.horses[tier];
+            newHorses[tier] = horse.copyWith(
+              duplicateCardCount: horse.duplicateCardCount + 1,
+            );
+          } else {
+            final jockey = state.jockeys[tier];
+            newJockeys[tier] = jockey.copyWith(
+              duplicateCardCount: jockey.duplicateCardCount + 1,
+            );
+          }
+        }
+        state = state.copyWith(
+          diamonds: state.diamonds - cost,
+          horses: newHorses,
+          jockeys: newJockeys,
+          lastSaved: _currentTrustedTime,
+        );
+        return true;
+      }
+    }
+    return false;
   }
 
   // Keep compatibility for older equipment chest openings
@@ -1341,7 +1778,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       state = state.copyWith(
         gold: state.gold - cost,
         inventory: newInventory,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1357,7 +1794,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       state = state.copyWith(
         diamonds: state.diamonds - cost,
         inventory: newInventory,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1420,7 +1857,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       }
     }
 
-    final String uniqueId = 'eq_${DateTime.now().microsecondsSinceEpoch}_${random.nextInt(1000)}';
+    final String uniqueId = 'eq_${_currentTrustedTime.microsecondsSinceEpoch}_${random.nextInt(1000)}';
 
     return EquipmentItem(
       id: uniqueId,
@@ -1454,7 +1891,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     state = state.copyWith(
       equippedEquipment: newEquipped,
       winChance: newWinChance,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -1477,7 +1914,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     state = state.copyWith(
       equippedEquipment: newEquipped,
       winChance: newWinChance,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -1528,7 +1965,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         raceRanks: nextRanks,
         raceTimeLeft: 45,
         raceDurationSeconds: 45,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1543,7 +1980,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       state = state.copyWith(
         diamonds: state.diamonds - 5,
         equippedEquipment: newEquipped,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1556,7 +1993,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       state = state.copyWith(
         gold: state.gold - cost,
         diamonds: state.diamonds + 1,
-        lastSaved: DateTime.now(),
+        lastSaved: _currentTrustedTime,
       );
       return true;
     }
@@ -1578,25 +2015,33 @@ class GameNotifier extends Notifier<GameStateModel> {
     final activeHorse = horses[tier];
     final activeJockey = jockeys[tier];
 
-    // Calculate Stable Level Stats (sum of all stats and skills for the active tier)
-    int stableLevelStats = 0;
+    int horseStatsSum = 0;
     activeHorse.stats.forEach((key, level) {
-      if (key == 'speed' || key == 'stamina') {
-        stableLevelStats += level * 3;
-      } else {
-        stableLevelStats += level * 2;
+      int baseVal = 0;
+      switch (key) {
+        case 'speed': baseVal = 20; break;
+        case 'stamina': baseVal = 20; break;
+        case 'acceleration': baseVal = 15; break;
+        case 'focus': baseVal = 15; break;
+        case 'cornering': baseVal = 10; break;
+        case 'temper': baseVal = 20; break;
       }
+      horseStatsSum += baseVal + (level - 1) * 3;
     });
+
+    int jockeySkillsSum = 0;
     activeJockey.skills.forEach((key, level) {
       if (key == 'pacing') {
-        stableLevelStats += level * 3;
+        jockeySkillsSum += level * 3;
       } else {
-        stableLevelStats += level * 2;
+        jockeySkillsSum += level * 2;
       }
     });
 
-    // Calculate Total Power
-    int totalPower = stableLevelStats + (activeHorse.currentStars * 100) + (activeJockey.currentStars * 100);
+    // Calculate Total Power: (Horse Stats Sum + Horse Star Coefficient) + (Jockey Skills Sum + Jockey Star Coefficient)
+    int horseTotalPower = horseStatsSum + (activeHorse.currentStars * 100).toInt();
+    int jockeyTotalPower = jockeySkillsSum + (activeJockey.currentStars * 100).toInt();
+    int totalPower = horseTotalPower + jockeyTotalPower;
 
     // Calculate Division Base Difficulty
     final difficulties = [800.0, 3600.0, 21600.0, 147600.0, 1254600.0];
@@ -1752,9 +2197,9 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   void simulateOfflineProgress(Duration duration) {
-    final simulatedPastSaveTime = DateTime.now().subtract(duration);
+    final simulatedPastSaveTime = _currentTrustedTime.subtract(duration);
     final stateBeforeOffline = state.copyWith(lastSaved: simulatedPastSaveTime);
-    state = _applyOfflineProgress(stateBeforeOffline, DateTime.now());
+    state = _applyOfflineProgress(stateBeforeOffline, _currentTrustedTime);
   }
 
   void resetGame() {
@@ -2061,7 +2506,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       raceTimeLeft: 450,
       horsePositions: List.filled(count, 0.0),
       raceRanks: nextRanks,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 
@@ -2069,7 +2514,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     double newGold = (state.gold + amount).clamp(0.0, double.infinity);
     state = state.copyWith(
       gold: newGold,
-      lastSaved: DateTime.now(),
+      lastSaved: _currentTrustedTime,
     );
   }
 

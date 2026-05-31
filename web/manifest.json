@@ -1,6 +1,6 @@
 {
-    "name": "pawpital",
-    "short_name": "pawpital",
+    "name": "Racing Hub",
+    "short_name": "Racing Hub",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

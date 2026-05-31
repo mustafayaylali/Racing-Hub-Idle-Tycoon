@@ -1,5 +1,383 @@
 import 'package:flutter/foundation.dart';
 
+
+
+@immutable
+class FacilityConfig {
+  final String nameTr;
+  final String nameEn;
+  final String descTr;
+  final String descEn;
+  final String emoji;
+
+  const FacilityConfig({
+    required this.nameTr,
+    required this.nameEn,
+    required this.descTr,
+    required this.descEn,
+    required this.emoji,
+  });
+}
+
+@immutable
+class CategoryConfig {
+  final String nameTr;
+  final String nameEn;
+  final String asset1NameTr;
+  final String asset1NameEn;
+  final String asset2NameTr;
+  final String asset2NameEn;
+  final String asset1SingleTr;
+  final String asset1SingleEn;
+  final String asset2SingleTr;
+  final String asset2SingleEn;
+  final String asset1Emoji;
+  final String asset2Emoji;
+  final String premiumAsset1Emoji;
+  final String premiumAsset2Emoji;
+  final Map<String, FacilityConfig> facilities;
+
+  const CategoryConfig({
+    required this.nameTr,
+    required this.nameEn,
+    required this.asset1NameTr,
+    required this.asset1NameEn,
+    required this.asset2NameTr,
+    required this.asset2NameEn,
+    required this.asset1SingleTr,
+    required this.asset1SingleEn,
+    required this.asset2SingleTr,
+    required this.asset2SingleEn,
+    required this.asset1Emoji,
+    required this.asset2Emoji,
+    required this.premiumAsset1Emoji,
+    required this.premiumAsset2Emoji,
+    required this.facilities,
+  });
+
+  static const List<CategoryConfig> categories = [
+    CategoryConfig(
+      nameTr: '🏇 At Yarışı',
+      nameEn: '🏇 Horse Racing',
+      asset1NameTr: 'Atlar',
+      asset1NameEn: 'Horses',
+      asset2NameTr: 'Jokeyler',
+      asset2NameEn: 'Jockeys',
+      asset1SingleTr: 'At',
+      asset1SingleEn: 'Horse',
+      asset2SingleTr: 'Jokey',
+      asset2SingleEn: 'Jockey',
+      asset1Emoji: '🐴',
+      asset2Emoji: '👨‍🌾',
+      premiumAsset1Emoji: '🦄',
+      premiumAsset2Emoji: '🏇',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Otopark',
+          nameEn: 'Parking Lot',
+          descTr: 'Ziyaretçiler için park alanı',
+          descEn: 'Parking area for visitors',
+          emoji: '🅿️',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Antrenman Pisti',
+          nameEn: 'Training Track',
+          descTr: 'Sürekli antrenman devreleri',
+          descEn: 'Continuous training circuits',
+          emoji: '🛣️',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Sağlık Merkezi',
+          nameEn: 'Health Center',
+          descTr: 'Rehabilitasyon & takviye',
+          descEn: 'Rehabilitation & therapy',
+          emoji: '🏥',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Ahır',
+          nameEn: 'Stables',
+          descTr: 'Atlar için barınak',
+          descEn: 'Shelter for horses',
+          emoji: '🛖',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks Ahır',
+          nameEn: 'Luxury Stable',
+          descTr: 'Birinci sınıf yaşam alanı',
+          descEn: 'Premium living space',
+          emoji: '🏰',
+        ),
+      },
+    ),
+    CategoryConfig(
+      nameTr: '🏍️ Motor Yarışı',
+      nameEn: '🏍️ Motor Racing',
+      asset1NameTr: 'Yarış Arabaları',
+      asset1NameEn: 'Racing Cars',
+      asset2NameTr: 'Pilotlar',
+      asset2NameEn: 'Pilots',
+      asset1SingleTr: 'Yarış Arabası',
+      asset1SingleEn: 'Racing Car',
+      asset2SingleTr: 'Pilot',
+      asset2SingleEn: 'Pilot',
+      asset1Emoji: '🏎️',
+      asset2Emoji: '👨',
+      premiumAsset1Emoji: '🚀',
+      premiumAsset2Emoji: '🧑‍🚀',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Mekanik Pit Alanı',
+          nameEn: 'Mechanical Pit Lane',
+          descTr: 'Hızlı lastik değişimi ve onarımlar',
+          descEn: 'Fast tire changes and repairs',
+          emoji: '🔧',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Rüzgar Tüneli',
+          nameEn: 'Wind Tunnel',
+          descTr: 'Aerodinamik testler ve optimizasyon',
+          descEn: 'Aerodynamic testing and optimization',
+          emoji: '🌀',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Simülatör Odası',
+          nameEn: 'Simulator Room',
+          descTr: 'Sürücü eğitimi ve pist analizleri',
+          descEn: 'Driver training and track analysis',
+          emoji: '🖥️',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Garaj / Motor Atölyesi',
+          nameEn: 'Garage / Engine Workshop',
+          descTr: 'Yarış araçları montajı ve bakımı',
+          descEn: 'Assembly and maintenance of racing cars',
+          emoji: '🏎️',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks VIP Garajı',
+          nameEn: 'Luxury VIP Garage',
+          descTr: 'Birinci sınıf VIP garaj alanı',
+          descEn: 'Premium VIP garage space',
+          emoji: '🏢',
+        ),
+      },
+    ),
+    CategoryConfig(
+      nameTr: '🏎️ F1 Yarışı',
+      nameEn: '🏎️ F1 Racing',
+      asset1NameTr: 'F1 Arabaları',
+      asset1NameEn: 'F1 Cars',
+      asset2NameTr: 'Profesyonel Sürücüler',
+      asset2NameEn: 'Professional Drivers',
+      asset1SingleTr: 'F1 Arabası',
+      asset1SingleEn: 'F1 Car',
+      asset2SingleTr: 'Profesyonel Sürücü',
+      asset2SingleEn: 'Professional Driver',
+      asset1Emoji: '🏎️',
+      asset2Emoji: '👨‍✈️',
+      premiumAsset1Emoji: '🏎️',
+      premiumAsset2Emoji: '🏆',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Mekanik Pit Alanı',
+          nameEn: 'Mechanical Pit Lane',
+          descTr: 'Hızlı lastik değişimi ve onarımlar',
+          descEn: 'Fast tire changes and repairs',
+          emoji: '🔧',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Rüzgar Tüneli',
+          nameEn: 'Wind Tunnel',
+          descTr: 'Aerodinamik testler ve optimizasyon',
+          descEn: 'Aerodynamic testing and optimization',
+          emoji: '🌀',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Simülatör Odası',
+          nameEn: 'Simulator Room',
+          descTr: 'Sürücü eğitimi ve pist analizleri',
+          descEn: 'Driver training and track analysis',
+          emoji: '🖥️',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Garaj / Motor Atölyesi',
+          nameEn: 'Garage / Engine Workshop',
+          descTr: 'Yarış araçları montajı ve bakımı',
+          descEn: 'Assembly and maintenance of racing cars',
+          emoji: '🏎️',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks VIP Garajı',
+          nameEn: 'Luxury VIP Garage',
+          descTr: 'Birinci sınıf VIP garaj alanı',
+          descEn: 'Premium VIP garage space',
+          emoji: '🏢',
+        ),
+      },
+    ),
+    CategoryConfig(
+      nameTr: '🏃 Atletizm',
+      nameEn: '🏃 Athletics',
+      asset1NameTr: 'Atletler',
+      asset1NameEn: 'Athletes',
+      asset2NameTr: 'Koçlar',
+      asset2NameEn: 'Coaches',
+      asset1SingleTr: 'Atlet',
+      asset1SingleEn: 'Athlete',
+      asset2SingleTr: 'Koç',
+      asset2SingleEn: 'Coach',
+      asset1Emoji: '🏃',
+      asset2Emoji: '🕴️',
+      premiumAsset1Emoji: '🏃‍♀️',
+      premiumAsset2Emoji: '👟',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Kafeterya',
+          nameEn: 'Cafeteria',
+          descTr: 'Sporcular için besleyici yemekler',
+          descEn: 'Nutritious meals for athletes',
+          emoji: '☕',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Olimpiyat Tartan Pisti',
+          nameEn: 'Olympic Tartan Track',
+          descTr: 'Kondisyon ve koşu antrenmanları',
+          descEn: 'Conditioning and running training',
+          emoji: '🏃‍♂️',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Fizyoterapi Merkezi',
+          nameEn: 'Physiotherapy Center',
+          descTr: 'Kas kurtarma ve rehabilitasyon seansları',
+          descEn: 'Muscle recovery and rehab sessions',
+          emoji: '💆',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Sporcu Lojmanları',
+          nameEn: 'Athlete Dormitories',
+          descTr: 'Sporcular için konaklama ve dinlenme',
+          descEn: 'Accommodation and rest for athletes',
+          emoji: '🏢',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks VIP Lojmanı',
+          nameEn: 'Luxury VIP Dorms',
+          descTr: 'Birinci sınıf sporcu dinlenme kompleksi',
+          descEn: 'Premium athlete relaxation complex',
+          emoji: '🏨',
+        ),
+      },
+    ),
+    CategoryConfig(
+      nameTr: '🛸 Drone Yarışı',
+      nameEn: '🛸 Drone Racing',
+      asset1NameTr: "Drone'lar",
+      asset1NameEn: 'Drones',
+      asset2NameTr: 'Yapay Zekalar',
+      asset2NameEn: 'AIs',
+      asset1SingleTr: 'Drone',
+      asset1SingleEn: 'Drone',
+      asset2SingleTr: 'Yapay Zeka',
+      asset2SingleEn: 'AI',
+      asset1Emoji: '🛸',
+      asset2Emoji: '🤖',
+      premiumAsset1Emoji: '🛰️',
+      premiumAsset2Emoji: '🧠',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Şarj İstasyonu',
+          nameEn: 'Charging Station',
+          descTr: 'Hızlı batarya dolumu ve güç yönetimi',
+          descEn: 'Fast battery recharging and power management',
+          emoji: '⚡',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Lazer Test Kulvarı',
+          nameEn: 'Laser Test Lane',
+          descTr: 'Drone manevra ve lazer sensör testleri',
+          descEn: 'Drone maneuver and laser sensor tests',
+          emoji: '🎯',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Yazılım Laboratuvarı',
+          nameEn: 'Software Lab',
+          descTr: 'AI güncellemeleri ve yazılım kalibrasyonu',
+          descEn: 'AI updates and software calibration',
+          emoji: '💻',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Hangar / Montaj Hattı',
+          nameEn: 'Hangar / Assembly Line',
+          descTr: 'Drone gövde yapımı ve bakım üssü',
+          descEn: 'Drone chassis build and maintenance base',
+          emoji: '🛸',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks Kuantum Hangarı',
+          nameEn: 'Luxury Quantum Hangar',
+          descTr: 'Üst seviye drone depolama ve geliştirme',
+          descEn: 'High-end drone storage and development',
+          emoji: '🪐',
+        ),
+      },
+    ),
+    CategoryConfig(
+      nameTr: '🛥️ Deniz Yarışı',
+      nameEn: '🛥️ Boat Racing',
+      asset1NameTr: 'Sürat Tekneleri',
+      asset1NameEn: 'Speedboats',
+      asset2NameTr: 'Kaptanlar',
+      asset2NameEn: 'Captains',
+      asset1SingleTr: 'Sürat Teknesi',
+      asset1SingleEn: 'Speedboat',
+      asset2SingleTr: 'Kaptan',
+      asset2SingleEn: 'Captain',
+      asset1Emoji: '🛥️',
+      asset2Emoji: '🧑‍✈️',
+      premiumAsset1Emoji: '🚢',
+      premiumAsset2Emoji: '⚓',
+      facilities: {
+        'training_track': FacilityConfig(
+          nameTr: 'Yakıt İskelesi',
+          nameEn: 'Fueling Dock',
+          descTr: 'Sürat tekneleri için hızlı yakıt ikmali',
+          descEn: 'Fast refueling for speedboats',
+          emoji: '⛽',
+        ),
+        'medical_center': FacilityConfig(
+          nameTr: 'Dalga Havuzu',
+          nameEn: 'Wave Pool',
+          descTr: 'Zorlu deniz koşulları simülasyonu',
+          descEn: 'Simulation of challenging sea conditions',
+          emoji: '🌊',
+        ),
+        'feed_storage': FacilityConfig(
+          nameTr: 'Teknik Tersane',
+          nameEn: 'Technical Shipyard',
+          descTr: 'Gövde onarımı ve motor modifikasyonları',
+          descEn: 'Hull repair and engine modifications',
+          emoji: '🛠️',
+        ),
+        'research_lab': FacilityConfig(
+          nameTr: 'Marina / Yat Limanı',
+          nameEn: 'Marina / Yacht Port',
+          descTr: 'Tekneler için güvenli bağlama limanı',
+          descEn: 'Safe mooring port for boats',
+          emoji: '⚓',
+        ),
+        'luxury_stable': FacilityConfig(
+          nameTr: 'Lüks Yat Kulübü',
+          nameEn: 'Luxury Yacht Club',
+          descTr: 'Seçkin kaptanlar için özel VIP liman',
+          descEn: 'Exclusive VIP port for elite captains',
+          emoji: '⛵',
+        ),
+      },
+    ),
+  ];
+}
+
+
 @immutable
 class EquipmentItem {
   final String id;
@@ -61,7 +439,7 @@ class HorseAsset {
   final String id;
   final String name;
   final int associatedLeagueTier;
-  final int currentStars;
+  final double currentStars;
   final int duplicateCardCount;
   final Map<String, int> stats;
 
@@ -79,7 +457,7 @@ class HorseAsset {
       id: json['id'] as String,
       name: json['name'] as String,
       associatedLeagueTier: (json['associatedLeagueTier'] as num).toInt(),
-      currentStars: (json['currentStars'] as num).toInt(),
+      currentStars: (json['currentStars'] as num).toDouble(),
       duplicateCardCount: (json['duplicateCardCount'] as num).toInt(),
       stats: Map<String, int>.from(json['stats'] as Map? ?? {}),
     );
@@ -100,7 +478,7 @@ class HorseAsset {
     String? id,
     String? name,
     int? associatedLeagueTier,
-    int? currentStars,
+    double? currentStars,
     int? duplicateCardCount,
     Map<String, int>? stats,
   }) {
@@ -147,7 +525,7 @@ class JockeyAsset {
   final String id;
   final String name;
   final int associatedLeagueTier;
-  final int currentStars;
+  final double currentStars;
   final int duplicateCardCount;
   final Map<String, int> skills;
 
@@ -165,7 +543,7 @@ class JockeyAsset {
       id: json['id'] as String,
       name: json['name'] as String,
       associatedLeagueTier: (json['associatedLeagueTier'] as num).toInt(),
-      currentStars: (json['currentStars'] as num).toInt(),
+      currentStars: (json['currentStars'] as num).toDouble(),
       duplicateCardCount: (json['duplicateCardCount'] as num).toInt(),
       skills: Map<String, int>.from(json['skills'] as Map? ?? {}),
     );
@@ -186,7 +564,7 @@ class JockeyAsset {
     String? id,
     String? name,
     int? associatedLeagueTier,
-    int? currentStars,
+    double? currentStars,
     int? duplicateCardCount,
     Map<String, int>? skills,
   }) {
@@ -230,8 +608,29 @@ class JockeyAsset {
 
 @immutable
 class GameStateModel {
-  final double gold;
-  final int diamonds;
+  static const int _xorMask = 0x55AA55AA33CC33CC;
+  static const int _intXorMask = 0xDEADC0DE;
+
+  static int _doubleToBits(double value) {
+    final bd = ByteData(8);
+    bd.setFloat64(0, value);
+    return bd.getUint64(0);
+  }
+
+  static double _bitsToDouble(int bits) {
+    final bd = ByteData(8);
+    bd.setUint64(0, bits);
+    return bd.getFloat64(0);
+  }
+
+  final int _obfuscatedGoldBits;
+  final int _obfuscatedDiamonds;
+  final int _obfuscatedTickets;
+
+  double get gold => _bitsToDouble(_obfuscatedGoldBits ^ _xorMask);
+  int get diamonds => _obfuscatedDiamonds ^ _intXorMask;
+  int get tickets => _obfuscatedTickets ^ _intXorMask;
+
   final String currentDerbyLeague;
   final int leagueTier;
   final double leaguePoints;
@@ -249,6 +648,7 @@ class GameStateModel {
   final DateTime lastSaved;
 
   // New Fields
+  final DateTime lastTicketClaimTime;
   final int unlockedLeagueTier;
   final List<int> recentPlacements;
   final int boostTimeLeft;
@@ -275,9 +675,9 @@ class GameStateModel {
   final List<int> seasonHistory;
   final List<String> seasonClassHistory;
 
-  const GameStateModel({
-    required this.gold,
-    required this.diamonds,
+  GameStateModel({
+    required double gold,
+    required int diamonds,
     required this.currentDerbyLeague,
     required this.leagueTier,
     required this.leaguePoints,
@@ -318,7 +718,11 @@ class GameStateModel {
     required this.offlineDurationSeconds,
     required this.seasonHistory,
     required this.seasonClassHistory,
-  });
+    required int tickets,
+    required this.lastTicketClaimTime,
+  })  : _obfuscatedGoldBits = _doubleToBits(gold) ^ _xorMask,
+        _obfuscatedDiamonds = diamonds ^ _intXorMask,
+        _obfuscatedTickets = tickets ^ _intXorMask;
 
   static List<HorseAsset> defaultHorses() {
     return const [
@@ -326,90 +730,120 @@ class GameStateModel {
         id: 'h_0',
         name: 'Pony Express',
         associatedLeagueTier: 0,
-        currentStars: 1,
+        currentStars: 1.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
       HorseAsset(
         id: 'h_1',
         name: 'Cobalt Charger',
         associatedLeagueTier: 1,
-        currentStars: 1,
+        currentStars: 0.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
       HorseAsset(
         id: 'h_2',
-        name: 'Emerald Wind',
+        name: 'F1 Bolide',
         associatedLeagueTier: 2,
-        currentStars: 1,
+        currentStars: 0.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
       HorseAsset(
         id: 'h_3',
         name: 'Crimson Thunder',
         associatedLeagueTier: 3,
-        currentStars: 1,
+        currentStars: 0.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
       HorseAsset(
         id: 'h_4',
         name: 'Golden Eclipse',
         associatedLeagueTier: 4,
-        currentStars: 1,
+        currentStars: 0.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
       HorseAsset(
         id: 'h_5',
         name: 'Pegasus Prime',
         associatedLeagueTier: 5,
-        currentStars: 1,
+        currentStars: 0.0,
         duplicateCardCount: 0,
         stats: {
-          'speed': 0,
-          'acceleration': 0,
-          'stamina': 0,
-          'focus': 0,
-          'temper': 0,
-          'cornering': 0,
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
+        },
+      ),
+      HorseAsset(
+        id: 'h_6',
+        name: 'Shadow Legend',
+        associatedLeagueTier: 6,
+        currentStars: 0.0,
+        duplicateCardCount: 0,
+        stats: {
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
+        },
+      ),
+      HorseAsset(
+        id: 'h_7',
+        name: 'Golden Emperor',
+        associatedLeagueTier: 7,
+        currentStars: 0.0,
+        duplicateCardCount: 0,
+        stats: {
+          'speed': 1,
+          'acceleration': 1,
+          'stamina': 1,
+          'focus': 1,
+          'temper': 1,
+          'cornering': 1,
         },
       ),
     ];
@@ -443,7 +877,7 @@ class GameStateModel {
       ),
       JockeyAsset(
         id: 'j_2',
-        name: 'Jack Pacer',
+        name: 'Lewis Hamilton',
         associatedLeagueTier: 2,
         currentStars: 1,
         duplicateCardCount: 0,
@@ -496,7 +930,7 @@ class GameStateModel {
     return GameStateModel(
       gold: 500.0,
       diamonds: 10,
-      currentDerbyLeague: 'Village League',
+      currentDerbyLeague: '🏇 At Yarışı',
       leagueTier: 0,
       leaguePoints: 0.0,
       winChance: 0.20,
@@ -542,6 +976,8 @@ class GameStateModel {
       offlineDurationSeconds: 0,
       seasonHistory: const [],
       seasonClassHistory: const [],
+      tickets: 2,
+      lastTicketClaimTime: DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 
@@ -588,6 +1024,8 @@ class GameStateModel {
     int? offlineDurationSeconds,
     List<int>? seasonHistory,
     List<String>? seasonClassHistory,
+    int? tickets,
+    DateTime? lastTicketClaimTime,
   }) {
     return GameStateModel(
       gold: gold ?? this.gold,
@@ -632,13 +1070,15 @@ class GameStateModel {
       offlineDurationSeconds: offlineDurationSeconds ?? this.offlineDurationSeconds,
       seasonHistory: seasonHistory ?? this.seasonHistory,
       seasonClassHistory: seasonClassHistory ?? this.seasonClassHistory,
+      tickets: tickets ?? this.tickets,
+      lastTicketClaimTime: lastTicketClaimTime ?? this.lastTicketClaimTime,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'gold': gold,
-      'diamonds': diamonds,
+      'gold': _obfuscatedGoldBits.toRadixString(16),
+      'diamonds': _obfuscatedDiamonds.toRadixString(16),
       'currentDerbyLeague': currentDerbyLeague,
       'leagueTier': leagueTier,
       'leaguePoints': leaguePoints,
@@ -679,14 +1119,40 @@ class GameStateModel {
       'offlineDurationSeconds': offlineDurationSeconds,
       'seasonHistory': seasonHistory,
       'seasonClassHistory': seasonClassHistory,
+      'tickets': _obfuscatedTickets.toRadixString(16),
+      'lastTicketClaimTime': lastTicketClaimTime.toIso8601String(),
     };
   }
 
   factory GameStateModel.fromJson(Map<String, dynamic> json) {
+    double parsedGold;
+    if (json['gold'] is String) {
+      final bits = int.parse(json['gold'] as String, radix: 16);
+      parsedGold = _bitsToDouble(bits ^ _xorMask);
+    } else {
+      parsedGold = (json['gold'] as num?)?.toDouble() ?? 500.0;
+    }
+
+    int parsedDiamonds;
+    if (json['diamonds'] is String) {
+      final val = int.parse(json['diamonds'] as String, radix: 16);
+      parsedDiamonds = val ^ _intXorMask;
+    } else {
+      parsedDiamonds = (json['diamonds'] as num?)?.toInt() ?? 10;
+    }
+
+    int parsedTickets;
+    if (json['tickets'] is String) {
+      final val = int.parse(json['tickets'] as String, radix: 16);
+      parsedTickets = val ^ _intXorMask;
+    } else {
+      parsedTickets = (json['tickets'] as num?)?.toInt() ?? 2;
+    }
+
     return GameStateModel(
-      gold: (json['gold'] as num?)?.toDouble() ?? 500.0,
-      diamonds: (json['diamonds'] as num?)?.toInt() ?? 10,
-      currentDerbyLeague: json['currentDerbyLeague'] as String? ?? 'Village League',
+      gold: parsedGold,
+      diamonds: parsedDiamonds,
+      currentDerbyLeague: json['currentDerbyLeague'] as String? ?? '🏇 At Yarışı',
       leagueTier: (json['leagueTier'] as num?)?.toInt() ?? 0,
       leaguePoints: (json['leaguePoints'] as num?)?.toDouble() ?? 0.0,
       winChance: (json['winChance'] as num?)?.toDouble() ?? 0.20,
@@ -747,6 +1213,8 @@ class GameStateModel {
       offlineDurationSeconds: (json['offlineDurationSeconds'] as num?)?.toInt() ?? 0,
       seasonHistory: (json['seasonHistory'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
       seasonClassHistory: (json['seasonClassHistory'] as List?)?.map((e) => e as String).toList() ?? const [],
+      tickets: parsedTickets,
+      lastTicketClaimTime: json['lastTicketClaimTime'] != null ? DateTime.parse(json['lastTicketClaimTime'] as String) : DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 
@@ -799,7 +1267,9 @@ class GameStateModel {
         other.lastSeasonRank == lastSeasonRank &&
         other.offlineDurationSeconds == offlineDurationSeconds &&
         listEquals(other.seasonHistory, seasonHistory) &&
-        listEquals(other.seasonClassHistory, seasonClassHistory);
+        listEquals(other.seasonClassHistory, seasonClassHistory) &&
+        other.tickets == tickets &&
+        other.lastTicketClaimTime == lastTicketClaimTime;
   }
 
   @override
@@ -852,6 +1322,8 @@ class GameStateModel {
             offlineDurationSeconds,
             Object.hashAll(seasonHistory),
             Object.hashAll(seasonClassHistory),
+            tickets,
+            lastTicketClaimTime,
           ),
         ),
       ),

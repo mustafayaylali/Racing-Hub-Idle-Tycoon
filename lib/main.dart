@@ -19,19 +19,19 @@ void main() async {
   ]).then((_) {
     runApp(
       const ProviderScope(
-        child: PawpitalApp(),
+        child: RacingHubIdleTycoonApp(),
       ),
     );
   });
 }
 
-class PawpitalApp extends StatelessWidget {
-  const PawpitalApp({super.key});
+class RacingHubIdleTycoonApp extends StatelessWidget {
+  const RacingHubIdleTycoonApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cozy Derby: Idle Racing Tycoon',
+      title: 'Racing Hub',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainGameScreen(),
