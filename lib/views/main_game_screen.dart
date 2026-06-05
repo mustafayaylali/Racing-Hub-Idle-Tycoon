@@ -25,6 +25,8 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
   int _selectedHorseIndex = 0;
   int _selectedJockeyIndex = 0;
   List<int>? _lastTickHorseOrder;
+  int? _lastTabIndex;
+  late final ScrollController _horseScrollController = ScrollController();
 
   // Lig renkleri (dinamik pist arka planı)
   static const List<List<Color>> _leagueTrackGradients = [
@@ -51,6 +53,26 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
         _commentaryLogs.add(AppStrings.get(locale, 'commentary_ready'));
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _horseScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToActiveHorse(GameStateModel gameState) {
+    if (_horseScrollController.hasClients) {
+      final activeHorse = gameState.horses[gameState.leagueTier];
+      final activeIndex = activeHorse.associatedLeagueTier;
+      final double maxScroll = _horseScrollController.position.maxScrollExtent;
+      final double target = (activeIndex * 113.0 - 12.0).clamp(0.0, maxScroll);
+      _horseScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _addCommentary(String text) {
@@ -1043,9 +1065,15 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     return '${rank}th';
   }
 
-  void _upgradeHorseStat(int horseIndex, String statId) {
+  void _upgradeHorseStat(int chronologicalIndex, String statId) {
+    final gameState = ref.read(gameProvider);
+    final sortedHorses = List<HorseAsset>.from(gameState.horses)
+      ..sort((a, b) => a.associatedLeagueTier.compareTo(b.associatedLeagueTier));
+    final horse = sortedHorses[chronologicalIndex];
+    final realIndex = gameState.horses.indexWhere((h) => h.id == horse.id);
+
     final notifier = ref.read(gameProvider.notifier);
-    final success = notifier.upgradeHorseStat(horseIndex, statId);
+    final success = notifier.upgradeHorseStat(realIndex, statId);
     if (!success) {
       final locale = ref.read(localeProvider);
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -1201,6 +1229,138 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showStandardProbabilityInfoDialog() {
+    final notifier = ref.read(gameProvider.notifier);
+    final rates = notifier.getStandardChestDropRates();
+    final gameState = ref.read(gameProvider);
+    final locale = ref.read(localeProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.creamBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
+          ),
+          title: Text(
+            locale == 'tr' ? 'Standart At Parçası Olasılıkları' : 'Standard Horse Fragment Drop Rates',
+            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.charcoalBrown),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(gameState.horses.length, (index) {
+              final horse = gameState.horses[index];
+              final rate = rates[index];
+              final double targetStars = index == 7 ? 5.0 : 1.0 + index * 0.5;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(index == 0 ? '🐴' : index % 2 == 0 ? '🏇' : '🐎', style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 4),
+                        Text(
+                          horse.name,
+                          style: const TextStyle(fontSize: 11, fontFamily: 'Outfit', color: AppTheme.charcoalBrown),
+                        ),
+                        const SizedBox(width: 4),
+                        const SizedBox(width: 4),
+                        _buildStarRow(targetStars, size: 8),
+                      ],
+                    ),
+                    Text(
+                      '${rate.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.mintGreen, fontSize: 11),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                locale == 'tr' ? 'Kapat' : 'Close',
+                style: const TextStyle(color: AppTheme.charcoalBrown, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRareProbabilityInfoDialog() {
+    final notifier = ref.read(gameProvider.notifier);
+    final rates = notifier.getRareChestDropRates();
+    final gameState = ref.read(gameProvider);
+    final locale = ref.read(localeProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.creamBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
+          ),
+          title: Text(
+            locale == 'tr' ? 'Nadir At Parçası Olasılıkları' : 'Rare Horse Fragment Drop Rates',
+            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.charcoalBrown),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(gameState.horses.length, (index) {
+              final horse = gameState.horses[index];
+              final rate = rates[index];
+              final double targetStars = index == 7 ? 5.0 : 1.0 + index * 0.5;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(index == 0 ? '🐴' : index % 2 == 0 ? '🏇' : '🐎', style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 4),
+                        Text(
+                          horse.name,
+                          style: const TextStyle(fontSize: 11, fontFamily: 'Outfit', color: AppTheme.charcoalBrown),
+                        ),
+                        const SizedBox(width: 4),
+                        const SizedBox(width: 4),
+                        _buildStarRow(targetStars, size: 8),
+                      ],
+                    ),
+                    Text(
+                      '${rate.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.mintGreen, fontSize: 11),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                locale == 'tr' ? 'Kapat' : 'Close',
+                style: const TextStyle(color: AppTheme.charcoalBrown, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1449,6 +1609,17 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     // Ensure selected horse index is valid
     if (_selectedHorseIndex >= gameState.horses.length) {
       _selectedHorseIndex = 0;
+    }
+
+    if (gameState.currentTabIndex == 1 && _lastTabIndex != 1) {
+      _lastTabIndex = 1;
+      final activeIndex = gameState.horses[gameState.leagueTier].associatedLeagueTier;
+      _selectedHorseIndex = activeIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToActiveHorse(gameState);
+      });
+    } else if (gameState.currentTabIndex != 1) {
+      _lastTabIndex = gameState.currentTabIndex;
     }
     // Ensure selected jockey belongs to active league tier
     if (_selectedJockeyIndex >= gameState.jockeys.length || 
@@ -1772,23 +1943,31 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       width: 1.5,
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      const Text('💎', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            AppStrings.formatGold(gameState.diamonds.toDouble()),
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              color: Color(0xFF1976D2),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('💎', style: TextStyle(fontSize: 14)),
+                      ),
+                      Positioned.fill(
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Text(
+                                AppStrings.formatGold(gameState.diamonds.toDouble()),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  color: Color(0xFF1976D2),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -2909,21 +3088,21 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              // Coin -5k
+              // Elmas +100
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => notifier.debugAddGold(-5000.0),
+                  onPressed: () => notifier.debugAddDiamonds(100),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 30),
-                    backgroundColor: const Color(0xFFFFB74D),
+                    backgroundColor: const Color(0xFFBA68C8),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text(
-                    'Coin -5k',
-                    style: TextStyle(fontFamily: 'Outfit', fontSize: 10, fontWeight: FontWeight.bold),
+                  child: Text(
+                    locale == 'tr' ? 'Elmas +100' : 'Dia +100',
+                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 9.5, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -3003,7 +3182,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
       },
     ];
 
-    final selectedHorse = gameState.horses[_selectedHorseIndex];
+    final sortedHorses = List<HorseAsset>.from(gameState.horses)
+      ..sort((a, b) => a.associatedLeagueTier.compareTo(b.associatedLeagueTier));
+    final selectedHorse = sortedHorses[_selectedHorseIndex];
     final bool isSelectedHorseUnlocked = selectedHorse.currentStars > 0;
     final int speedVal = getStatValue('speed', selectedHorse.stats['speed'] ?? 1);
     final int staminaVal = getStatValue('stamina', selectedHorse.stats['stamina'] ?? 1);
@@ -3040,17 +3221,28 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     child: Column(
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('🎫', style: TextStyle(fontSize: 16)),
-                            const SizedBox(width: 4),
-                            Text(
-                              locale == 'tr' ? 'Standart At' : 'Standard Horse',
-                              style: const TextStyle(
-                                fontFamily: 'Outfit',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E3A8A), // Strong Koyu Mavi
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Text(
+                                'STANDART PARÇA',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1E3A8A), // Strong Koyu Mavi
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                _showStandardProbabilityInfoDialog();
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.only(left: 2.0),
+                                child: Text('ℹ️', style: TextStyle(fontSize: 11)),
                               ),
                             ),
                           ],
@@ -3171,17 +3363,28 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     child: Column(
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('💎', style: TextStyle(fontSize: 14)),
-                            const SizedBox(width: 4),
-                            Text(
-                              locale == 'tr' ? 'Nadir At' : 'Rare Horse',
-                              style: const TextStyle(
-                                fontFamily: 'Outfit',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF581C87), // Strong Koyu Mor
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Text(
+                                'NADİR PARÇA',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF581C87), // Strong Koyu Mor
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                _showRareProbabilityInfoDialog();
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.only(left: 2.0),
+                                child: Text('ℹ️', style: TextStyle(fontSize: 11)),
                               ),
                             ),
                           ],
@@ -3291,11 +3494,14 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
             height: 105,
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListView.builder(
+              controller: _horseScrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: gameState.horses.length,
               itemBuilder: (context, index) {
-                final horse = gameState.horses[index];
+                final sortedHorses = List<HorseAsset>.from(gameState.horses)
+                  ..sort((a, b) => a.associatedLeagueTier.compareTo(b.associatedLeagueTier));
+                final horse = sortedHorses[index];
                 final mainIndex = index;
                 final bool isSelected = _selectedHorseIndex == mainIndex;
                 final bool isAssigned = horse.id == gameState.horses[gameState.leagueTier].id;
@@ -3334,13 +3540,13 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
-                            color: AppTheme.mintGreen,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text(
-                            locale == 'tr' ? 'AKTİF' : 'ACTIVE',
-                            style: const TextStyle(
-                              color: Colors.white,
+                          child: const Text(
+                            'AKTİF',
+                            style: TextStyle(
+                              color: AppTheme.mintGreen,
                               fontSize: 7.5,
                               fontWeight: FontWeight.bold,
                             ),
@@ -3362,9 +3568,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                           ),
-                          child: Text(
-                            locale == 'tr' ? 'Ata' : 'Assign',
-                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                          child: const Text(
+                            'SEÇ',
+                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
                           ),
                         ),
                     ] else ...[
@@ -3396,7 +3602,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                   decoration: BoxDecoration(
                     color: isUnlocked
                         ? (isAssigned
-                            ? AppTheme.mintGreen.withValues(alpha: 0.15)
+                            ? const Color(0xFFE8F5E9)
                             : (isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7)))
                         : (isSelected ? Colors.white : Colors.grey.shade50.withValues(alpha: 0.8)),
                     borderRadius: BorderRadius.circular(12),
@@ -3682,24 +3888,11 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: () {
-                          final success = notifier.buyPremiumHorse(_selectedHorseIndex);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(locale == 'tr'
-                                    ? '✅ ${selectedHorse.name} Kilidi Açıldı!'
-                                    : '✅ ${selectedHorse.name} Unlocked!'),
-                                backgroundColor: AppTheme.mintGreen,
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(AppStrings.get(locale, 'not_enough_diamonds')),
-                                backgroundColor: AppTheme.salmonPink,
-                              ),
-                            );
-                          }
+                          notifier.setTabIndex(4); // Switch to Market/Store tab
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const MarketScreen()),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.amber,
@@ -3708,18 +3901,9 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 2,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              locale == 'tr' ? 'Hemen Satın Al ' : 'Buy Instantly ',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '(${(_selectedHorseIndex + 1) * 30} 💎)',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFFF9C4)),
-                            ),
-                          ],
+                        child: const Text(
+                          'Parça Satın Al',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -5197,32 +5381,40 @@ class _PulsingGoldWidgetState extends State<PulsingGoldWidget> with SingleTicker
             width: 1.5,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            const Text('🪙', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 4),
-            Expanded(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0.0, end: widget.gold),
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-                builder: (ctx, value, child) {
-                  return FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      AppStrings.formatGold(value),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        color: Color(0xFFB7791F),
-                      ),
-                    ),
-                  );
-                },
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('🪙', style: TextStyle(fontSize: 14)),
+            ),
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.0, end: widget.gold),
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    builder: (ctx, value, child) {
+                      return FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.center,
+                        child: Text(
+                          AppStrings.formatGold(value),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: Color(0xFFB7791F),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ],

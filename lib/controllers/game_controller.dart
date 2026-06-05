@@ -60,6 +60,28 @@ class GameNotifier extends Notifier<GameStateModel> {
     return sha256.convert(bytes).toString();
   }
 
+  String _encrypt(String input) {
+    const String salt = "RacingHubPrivateSaltKey2026!";
+    final List<int> inputBytes = utf8.encode(input);
+    final List<int> keyBytes = utf8.encode(salt);
+    final List<int> resultBytes = List<int>.filled(inputBytes.length, 0);
+    for (int i = 0; i < inputBytes.length; i++) {
+      resultBytes[i] = inputBytes[i] ^ keyBytes[i % keyBytes.length] ^ (i * 31 % 256);
+    }
+    return base64.encode(resultBytes);
+  }
+
+  String _decrypt(String base64Input) {
+    const String salt = "RacingHubPrivateSaltKey2026!";
+    final List<int> inputBytes = base64.decode(base64Input);
+    final List<int> keyBytes = utf8.encode(salt);
+    final List<int> resultBytes = List<int>.filled(inputBytes.length, 0);
+    for (int i = 0; i < inputBytes.length; i++) {
+      resultBytes[i] = inputBytes[i] ^ keyBytes[i % keyBytes.length] ^ (i * 31 % 256);
+    }
+    return utf8.decode(resultBytes);
+  }
+
 
   List<Map<String, dynamic>> getDisciplineRanks() {
     final List<Map<String, dynamic>> ranks = [];
@@ -202,12 +224,14 @@ class GameNotifier extends Notifier<GameStateModel> {
         'data': jsonStr,
         'checksum': checksum,
       };
-      sharedPrefs.setString('game_state_json', jsonEncode(envelope));
+      final encryptedState = _encrypt(jsonEncode(envelope));
+      sharedPrefs.setString('game_state_json', encryptedState);
       
       final Map<String, Map<String, dynamic>> serialized = _leagueStates.map(
         (key, val) => MapEntry(key.toString(), val),
       );
-      sharedPrefs.setString('league_states_json', jsonEncode(serialized));
+      final encryptedLeagues = _encrypt(jsonEncode(serialized));
+      sharedPrefs.setString('league_states_json', encryptedLeagues);
     }
     
     super.state = value;
@@ -228,7 +252,8 @@ class GameNotifier extends Notifier<GameStateModel> {
     final String? leagueStatesStr = sharedPrefs.getString('league_states_json');
     if (leagueStatesStr != null) {
       try {
-        final decoded = jsonDecode(leagueStatesStr) as Map<String, dynamic>;
+        final String decrypted = leagueStatesStr.startsWith('{') ? leagueStatesStr : _decrypt(leagueStatesStr);
+        final decoded = jsonDecode(decrypted) as Map<String, dynamic>;
         _leagueStates.clear();
         decoded.forEach((key, val) {
           final intKey = int.tryParse(key);
@@ -245,7 +270,8 @@ class GameNotifier extends Notifier<GameStateModel> {
     final String? gameStateJson = sharedPrefs.getString('game_state_json');
     if (gameStateJson != null) {
       try {
-        final decoded = jsonDecode(gameStateJson) as Map<String, dynamic>;
+        final String decrypted = gameStateJson.startsWith('{') ? gameStateJson : _decrypt(gameStateJson);
+        final decoded = jsonDecode(decrypted) as Map<String, dynamic>;
         GameStateModel loadedState;
         if (decoded.containsKey('data') && decoded.containsKey('checksum')) {
           final String dataStr = decoded['data'] as String;
@@ -374,7 +400,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     final ranks = List<int>.filled(count, 0);
     final roll = random.nextDouble() * 100.0;
     final List<int> allRanks = List.generate(count, (i) => i + 1);
-    final bool canWin1st = !(winChance > 0.0 && winChance <= 0.25);
+    final bool canWin1st = winChance > 0.25;
     if (canWin1st && roll < winChance * 100.0) {
       ranks[0] = 1;
       final otherRanks = allRanks.sublist(1)..shuffle(random);
@@ -1275,11 +1301,83 @@ class GameNotifier extends Notifier<GameStateModel> {
     return null;
   }
 
+  List<double> getStandardChestDropRates() {
+    int tCurrent = state.unlockedLeagueTier; // 0 to 7
+    List<double> weights = List.filled(8, 0.0);
+    
+    if (tCurrent >= 7) {
+      return List.filled(8, 12.5);
+    }
+    
+    int next1 = tCurrent + 1;
+    int next2 = tCurrent + 2;
+    int next3 = tCurrent + 3;
+    
+    List<int> farTiers = [];
+    for (int i = tCurrent + 4; i <= tCurrent + 6; i++) {
+      if (i < 7) farTiers.add(i);
+    }
+    
+    int endgame = 7;
+    
+    double weightNext1 = 55.0;
+    double weightNext2 = 25.0;
+    double weightNext3 = 12.0;
+    double weightFar = 7.5;
+    double weightEndgame = 0.5;
+    
+    if (next1 <= 7) weights[next1] = weightNext1;
+    if (next2 <= 7) weights[next2] = weightNext2;
+    if (next3 <= 7) weights[next3] = weightNext3;
+    
+    if (farTiers.isNotEmpty) {
+      double perFar = weightFar / farTiers.length;
+      for (int t in farTiers) {
+        weights[t] = perFar;
+      }
+    } else {
+      if (next1 <= 7) weights[next1] += weightFar * 0.5;
+      if (next2 <= 7) weights[next2] += weightFar * 0.5;
+    }
+    
+    weights[endgame] = weightEndgame;
+    
+    final bool allUnlocked = state.horses.every((h) => h.currentStars > 0.0);
+    if (!allUnlocked) {
+      for (int i = 0; i < weights.length; i++) {
+        if (state.horses[i].currentStars > 0.0) {
+          weights[i] = 0.0;
+        }
+      }
+    }
+    
+    double sum = weights.reduce((a, b) => a + b);
+    if (sum > 0) {
+      for (int i = 0; i < weights.length; i++) {
+        weights[i] = (weights[i] / sum) * 100.0;
+      }
+    }
+    return weights;
+  }
+
+  int rollStandardChestDrop(math.Random rand) {
+    final rates = getStandardChestDropRates();
+    double roll = rand.nextDouble() * 100.0;
+    double cumulative = 0.0;
+    for (int i = 0; i < rates.length; i++) {
+      cumulative += rates[i];
+      if (roll <= cumulative) {
+        return i;
+      }
+    }
+    return 7;
+  }
+
   Map<String, dynamic>? openStandardChest1xTicket() {
     if (state.tickets >= 1) {
       state = state.copyWith(tickets: state.tickets - 1);
       final rand = math.Random();
-      final tier = rand.nextInt(state.horses.length);
+      final tier = rollStandardChestDrop(rand);
       addHorseFragments(tier, 1);
       return {
         'type': 'horse',
@@ -1299,7 +1397,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       final List<Map<String, dynamic>> drops = [];
       final Map<int, int> tierDrops = {};
       for (int i = 0; i < 10; i++) {
-        final tier = rand.nextInt(state.horses.length);
+        final tier = rollStandardChestDrop(rand);
         tierDrops[tier] = (tierDrops[tier] ?? 0) + 1;
       }
       tierDrops.forEach((tier, amount) {
@@ -1316,12 +1414,95 @@ class GameNotifier extends Notifier<GameStateModel> {
     return null;
   }
 
+  List<double> getRareChestDropRates() {
+    int tCurrent = state.unlockedLeagueTier; // 0 to 7
+    List<double> weights = List.filled(8, 0.0);
+    
+    if (tCurrent >= 7) {
+      return List.filled(8, 12.5);
+    }
+    
+    int next1 = tCurrent + 1;
+    int next2 = tCurrent + 2;
+    
+    List<int> midTiers = [];
+    for (int i = tCurrent + 3; i <= tCurrent + 5; i++) {
+      if (i < 7) midTiers.add(i);
+    }
+    
+    List<int> highTiers = [];
+    if (tCurrent + 6 < 7) {
+      highTiers.add(tCurrent + 6);
+    }
+    
+    int endgame = 7;
+    
+    double weightNext1 = 35.0;
+    double weightNext2 = 30.0;
+    double weightMid = 25.0;
+    double weightHigh = 8.0;
+    double weightEndgame = 2.0;
+    
+    if (next1 <= 7) weights[next1] = weightNext1;
+    if (next2 <= 7) weights[next2] = weightNext2;
+    
+    if (midTiers.isNotEmpty) {
+      double perMid = weightMid / midTiers.length;
+      for (int t in midTiers) {
+        weights[t] = perMid;
+      }
+    } else {
+      if (next1 <= 7) weights[next1] += weightMid * 0.5;
+      if (next2 <= 7) weights[next2] += weightMid * 0.5;
+    }
+    
+    if (highTiers.isNotEmpty) {
+      for (int t in highTiers) {
+        weights[t] = weightHigh;
+      }
+    } else {
+      if (next2 <= 7) weights[next2] += weightHigh;
+    }
+    
+    weights[endgame] = weightEndgame;
+    
+    final bool allUnlocked = state.horses.every((h) => h.currentStars > 0.0);
+    if (!allUnlocked) {
+      for (int i = 0; i < weights.length; i++) {
+        if (state.horses[i].currentStars > 0.0) {
+          weights[i] = 0.0;
+        }
+      }
+    }
+    
+    double sum = weights.reduce((a, b) => a + b);
+    if (sum > 0) {
+      for (int i = 0; i < weights.length; i++) {
+        weights[i] = (weights[i] / sum) * 100.0;
+      }
+    }
+    return weights;
+  }
+
+  int rollRareChestDrop(math.Random rand) {
+    final rates = getRareChestDropRates();
+    double roll = rand.nextDouble() * 100.0;
+    double cumulative = 0.0;
+    for (int i = 0; i < rates.length; i++) {
+      cumulative += rates[i];
+      if (roll <= cumulative) {
+        return i;
+      }
+    }
+    return 7;
+  }
+
   Map<String, dynamic>? openNadirChest1xDiamonds() {
     const cost = 50;
     if (state.diamonds >= cost) {
       state = state.copyWith(diamonds: state.diamonds - cost);
       final rand = math.Random();
-      final tier = 2 + rand.nextInt(state.horses.length - 2);
+      final tier = rollRareChestDrop(rand);
       final amount = 3;
       addHorseFragments(tier, amount);
       return {
@@ -1342,7 +1523,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       final List<Map<String, dynamic>> drops = [];
       final Map<int, int> tierDrops = {};
       for (int i = 0; i < 10; i++) {
-        final tier = 2 + rand.nextInt(state.horses.length - 2);
+        final tier = rollRareChestDrop(rand);
         tierDrops[tier] = (tierDrops[tier] ?? 0) + 3;
       }
       tierDrops.forEach((tier, amount) {
@@ -1703,6 +1884,47 @@ class GameNotifier extends Notifier<GameStateModel> {
       diamonds: state.diamonds + amount,
       lastSaved: _currentTrustedTime,
     );
+  }
+
+  int getDiamondAdCounter() {
+    return sharedPrefs.getInt('diamond_ad_count') ?? 0;
+  }
+
+  void watchAdForDiamonds() {
+    final currentCount = getDiamondAdCounter();
+    int nextCount = currentCount + 1;
+    if (nextCount >= 3) {
+      state = state.copyWith(
+        diamonds: state.diamonds + 10,
+        lastSaved: _currentTrustedTime,
+      );
+      nextCount = 0;
+    }
+    sharedPrefs.setInt('diamond_ad_count', nextCount);
+  }
+
+  bool buyCoinsWithDiamonds(double amount, int cost) {
+    if (state.diamonds >= cost) {
+      state = state.copyWith(
+        diamonds: state.diamonds - cost,
+        gold: state.gold + amount,
+        lastSaved: _currentTrustedTime,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  bool buyTicketWithDiamonds(int cost, int amount) {
+    if (state.diamonds >= cost) {
+      state = state.copyWith(
+        diamonds: state.diamonds - cost,
+        tickets: state.tickets + amount,
+        lastSaved: _currentTrustedTime,
+      );
+      return true;
+    }
+    return false;
   }
 
   bool buyCardPack(bool isGold) {
@@ -2084,8 +2306,10 @@ class GameNotifier extends Notifier<GameStateModel> {
   GameStateModel _applyOfflineProgress(GameStateModel currentState, DateTime now) {
     final difference = now.difference(currentState.lastSaved);
     int secondsOffline = difference.inSeconds;
-    if (secondsOffline > 7200 || secondsOffline < 0) {
+    if (secondsOffline < 0) {
       secondsOffline = 0;
+    } else if (secondsOffline > 7200) {
+      secondsOffline = 7200; // Cap at 2 hours max
     }
 
     if (currentState.goldPerSecond == 0) {
@@ -2337,7 +2561,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     
     // 1. Simulate placement
     final double roll = rand.nextDouble() * 100.0;
-    final bool canWin1st = !(winChance > 0.0 && winChance < 0.20);
+    final bool canWin1st = winChance > 0.25;
     int playerRank = 1;
     if (!canWin1st || roll >= winChance * 100.0) {
       playerRank = rand.nextInt(cnt - 1) + 2;
@@ -2514,6 +2738,14 @@ class GameNotifier extends Notifier<GameStateModel> {
     double newGold = (state.gold + amount).clamp(0.0, double.infinity);
     state = state.copyWith(
       gold: newGold,
+      lastSaved: _currentTrustedTime,
+    );
+  }
+
+  void debugAddDiamonds(int amount) {
+    int newDiamonds = (state.diamonds + amount).clamp(0, 999999999);
+    state = state.copyWith(
+      diamonds: newDiamonds,
       lastSaved: _currentTrustedTime,
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controllers/game_controller.dart';
@@ -99,6 +100,382 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
         );
       }
     });
+  }
+
+  double roundDownToTensUnit(double value) {
+    if (value <= 10.0) return value.floorToDouble();
+    double factor = 10.0;
+    while (factor * 10.0 <= value) {
+      factor *= 10.0;
+    }
+    return (value / factor).floorToDouble() * factor;
+  }
+
+  void _watchAdForDiamonds(BuildContext context, GameNotifier notifier, String locale) {
+    setState(() {
+      _adLoading = true;
+    });
+
+    final nav = Navigator.of(context);
+    final scaffold = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppTheme.creamBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: AppTheme.mintGreen),
+                const SizedBox(height: 16),
+                Text(
+                  locale == 'tr' ? 'Reklam İzleniyor...' : 'Watching Ad...',
+                  style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      if (nav.canPop()) {
+        nav.pop();
+      }
+      
+      final currentAdCount = notifier.getDiamondAdCounter();
+      notifier.watchAdForDiamonds();
+      
+      setState(() {
+        _adLoading = false;
+      });
+
+      if (currentAdCount + 1 >= 3) {
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(locale == 'tr' 
+                ? '🎉 3/3 Reklam izlendi! 10 Elmas kazanıldı!' 
+                : '🎉 3/3 Ads watched! 10 Diamonds earned!'),
+            backgroundColor: AppTheme.mintGreen,
+          ),
+        );
+      } else {
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(locale == 'tr' 
+                ? 'Reklam izlendi (${currentAdCount + 1}/3)' 
+                : 'Ad watched (${currentAdCount + 1}/3)'),
+            backgroundColor: AppTheme.mintGreen,
+          ),
+        );
+      }
+    });
+  }
+
+  Widget _buildDiamondAdBundle(BuildContext context, GameNotifier notifier, String locale) {
+    final adCount = notifier.getDiamondAdCounter();
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blue.shade100, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('📺', style: TextStyle(fontSize: 16)),
+              SizedBox(width: 4),
+              Text(
+                '💎 10',
+                style: TextStyle(fontFamily: 'Outfit', fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF1976D2)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: _adLoading
+                ? null
+                : () => _watchAdForDiamonds(context, notifier, locale),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.mintGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              minimumSize: const Size.fromHeight(26),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.play_circle_fill, size: 10),
+                const SizedBox(width: 2),
+                Text(
+                  '$adCount/3',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoinPack(
+    BuildContext context,
+    GameNotifier notifier,
+    int packIndex,
+    double coinsAmount,
+    int diamondCost,
+    String emoji,
+    String locale,
+    GameStateModel gameState,
+  ) {
+    final bool canAfford = gameState.diamonds >= diamondCost;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.amber.shade100, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.amber.withValues(alpha: 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _formatNumber(coinsAmount),
+                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFD68F1A)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: canAfford
+                  ? () {
+                      final success = notifier.buyCoinsWithDiamonds(coinsAmount, diamondCost);
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(locale == 'tr'
+                                ? '🎉 Satın alma başarılı! ${_formatNumber(coinsAmount)} Coin eklendi.'
+                                : '🎉 Purchase successful! ${_formatNumber(coinsAmount)} Coins added.'),
+                            backgroundColor: AppTheme.mintGreen,
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade600,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: const Size.fromHeight(26),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                '💎 $diamondCost',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketAdPack(BuildContext context, GameNotifier notifier, String locale) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.amber.shade100, width: 1.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🎫', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 4),
+                Text(
+                  locale == 'tr' ? '1 Bilet' : '1 Ticket',
+                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.w900, color: AppTheme.charcoalBrown),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _adLoading
+                  ? null
+                  : () {
+                      setState(() {
+                        _adLoading = true;
+                      });
+                      final nav = Navigator.of(context);
+                      final scaffold = ScaffoldMessenger.of(context);
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => Dialog(
+                          backgroundColor: AppTheme.creamBackground,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(color: AppTheme.mintGreen),
+                                const SizedBox(height: 16),
+                                Text(
+                                  locale == 'tr' ? 'Reklam İzleniyor...' : 'Watching Ad...',
+                                  style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (!mounted) return;
+                        if (nav.canPop()) nav.pop();
+                        notifier.claimAdTicket();
+                        setState(() {
+                          _adLoading = false;
+                        });
+                        scaffold.showSnackBar(
+                          SnackBar(
+                            content: Text(locale == 'tr' ? '🎉 1 Giriş Bileti Kazanıldı!' : '🎉 1 Entrance Ticket Claimed!'),
+                            backgroundColor: AppTheme.mintGreen,
+                          ),
+                        );
+                      });
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.mintGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: const Size.fromHeight(26),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.play_circle_fill, size: 10),
+                  const SizedBox(width: 2),
+                  Text(locale == 'tr' ? 'Reklam' : 'Ad', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketPurchasePack(
+    BuildContext context,
+    GameNotifier notifier,
+    int amount,
+    int diamondCost,
+    String locale,
+    GameStateModel gameState,
+  ) {
+    final bool canAfford = gameState.diamonds >= diamondCost;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.amber.shade100, width: 1.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🎫', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 4),
+                Text(
+                  locale == 'tr' ? '$amount Bilet' : '$amount Tickets',
+                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.w900, color: AppTheme.charcoalBrown),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: canAfford
+                  ? () {
+                      final success = notifier.buyTicketWithDiamonds(diamondCost, amount);
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(locale == 'tr'
+                                ? '🎉 Satın alma başarılı! $amount Bilet eklendi.'
+                                : '🎉 Purchase successful! $amount Tickets added.'),
+                            backgroundColor: AppTheme.mintGreen,
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade600,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: const Size.fromHeight(26),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                '💎 $diamondCost',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showMarketBoxResultDialog(BuildContext context, Map<String, dynamic> result, String locale, GameStateModel gameState) {
@@ -219,6 +596,11 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
     final gameState = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
     final locale = ref.watch(localeProvider);
+
+    final double cCurrent = gameState.gold;
+    final double pack1Coins = math.max(100.0, (cCurrent / 8.0).floorToDouble());
+    final double pack2Coins = math.max(500.0, roundDownToTensUnit(cCurrent / 2.0));
+    final double pack3Coins = math.max(1000.0, roundDownToTensUnit(cCurrent));
 
     return Scaffold(
       appBar: AppBar(
@@ -473,15 +855,51 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.3,
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 0.75,
                   children: [
+                    _buildDiamondAdBundle(context, notifier, locale),
                     _buildDiamondBundle(context, notifier, 100, '\$0.99', '✨', locale),
-                    _buildDiamondBundle(context, notifier, 500, '\$4.99', '💰', locale),
-                    _buildDiamondBundle(context, notifier, 1200, '\$9.99', '👑', locale),
-                    _buildDiamondBundle(context, notifier, 3000, '\$19.99', '🏆', locale),
+                    _buildDiamondBundle(context, notifier, 255, '\$1.99', '🪙', locale),
+                    _buildDiamondBundle(context, notifier, 520, '\$4.99', '💰', locale),
+                    _buildDiamondBundle(context, notifier, 1100, '\$9.99', '👑', locale),
+                    _buildDiamondBundle(context, notifier, 2750, '\$19.99', '🏆', locale),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // 🪙 Coin Al Section
+                Text(
+                  locale == 'tr' ? '🪙 Coin Al' : '🪙 Buy Coins',
+                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildCoinPack(context, notifier, 1, pack1Coins, 10, '🪙', locale, gameState),
+                    const SizedBox(width: 8),
+                    _buildCoinPack(context, notifier, 2, pack2Coins, 30, '💰', locale, gameState),
+                    const SizedBox(width: 8),
+                    _buildCoinPack(context, notifier, 3, pack3Coins, 50, '🏆', locale, gameState),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // 🎫 Bilet Mağazası Section
+                Text(
+                  locale == 'tr' ? '🎫 Bilet Mağazası' : '🎫 Ticket Shop',
+                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildTicketAdPack(context, notifier, locale),
+                    const SizedBox(width: 8),
+                    _buildTicketPurchasePack(context, notifier, 1, 10, locale, gameState),
+                    const SizedBox(width: 8),
+                    _buildTicketPurchasePack(context, notifier, 5, 45, locale, gameState),
                   ],
                 ),
               ],
