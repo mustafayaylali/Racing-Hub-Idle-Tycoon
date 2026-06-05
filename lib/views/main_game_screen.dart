@@ -952,14 +952,63 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     const Divider(height: 1, color: Colors.black12),
                     const SizedBox(height: 16),
 
-                    // Dil Seçeneği
-                    buildSettingRow(
-                      label: AppStrings.get(locale, 'settings_lang_label'),
-                      valueText: AppStrings.get(locale, 'lang_toggle'),
-                      isActive: true,
-                      onTap: () {
-                        ref.read(localeProvider.notifier).update((state) => state == 'tr' ? 'en' : 'tr');
-                      },
+                    // Dil Seçeneği (Dropdown)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            AppStrings.get(locale, 'settings_lang_label'),
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.charcoalBrown,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.black12,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: locale,
+                                icon: const Icon(Icons.arrow_drop_down, color: AppTheme.charcoalBrown),
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.charcoalBrown,
+                                ),
+                                dropdownColor: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                onChanged: (String? newValue) {
+                                  if (newValue != null) {
+                                    ref.read(localeProvider.notifier).state = newValue;
+                                    sharedPrefs.setString('locale', newValue);
+                                  }
+                                },
+                                items: const [
+                                  DropdownMenuItem(value: 'tr', child: Text('🇹🇷 Türkçe')),
+                                  DropdownMenuItem(value: 'en', child: Text('🇬🇧 English')),
+                                  DropdownMenuItem(value: 'es', child: Text('🇪🇸 Español')),
+                                  DropdownMenuItem(value: 'pt', child: Text('🇧🇷 Português')),
+                                  DropdownMenuItem(value: 'ru', child: Text('🇷🇺 Русский')),
+                                  DropdownMenuItem(value: 'de', child: Text('🇩🇪 Deutsch')),
+                                  DropdownMenuItem(value: 'fr', child: Text('🇫🇷 Français')),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
                     // Ses Seçeneği
