@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart'; // Import global sharedPrefs
 
@@ -11,14 +10,6 @@ String _getInitialLocale() {
     final String? savedLocale = sharedPrefs.getString('locale');
     if (savedLocale != null && _supportedLocales.contains(savedLocale)) {
       return savedLocale;
-    }
-  } catch (_) {}
-
-  // 2. Try to match with device language
-  try {
-    final String deviceLanguage = ui.PlatformDispatcher.instance.locale.languageCode.toLowerCase();
-    if (_supportedLocales.contains(deviceLanguage)) {
-      return deviceLanguage;
     }
   } catch (_) {}
 

@@ -482,7 +482,7 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
     final int tier = result['tier'] as int;
     final String name = result['name'] as String;
     final int amount = result['amount'] as int;
-    final double stars = 1.5 + tier * 0.5;
+    final double stars = tier == 5 ? 6.0 : (tier + 1).toDouble();
 
     showDialog(
       context: context,
@@ -537,18 +537,33 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            Row(
-                              children: List.generate(5, (index) {
-                                final double starLimit = index + 1.0;
-                                if (stars >= starLimit) {
-                                  return const Icon(Icons.star_rounded, color: Colors.amber, size: 10);
-                                } else if (stars > starLimit - 1.0) {
-                                  return const Icon(Icons.star_half_rounded, color: Colors.amber, size: 10);
-                                } else {
-                                  return const Icon(Icons.star_outline_rounded, color: Colors.grey, size: 10);
-                                }
-                              }),
-                            ),
+                            stars == 6.0
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE5A93C),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'VIP',
+                                      style: TextStyle(
+                                        fontFamily: 'Outfit',
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    children: List.generate(5, (index) {
+                                      final double starLimit = index + 1.0;
+                                      if (stars >= starLimit) {
+                                        return const Icon(Icons.star_rounded, color: Colors.amber, size: 10);
+                                      } else {
+                                        return const Icon(Icons.star_outline_rounded, color: Colors.grey, size: 10);
+                                      }
+                                    }),
+                                  ),
                           ],
                         ),
                       ),

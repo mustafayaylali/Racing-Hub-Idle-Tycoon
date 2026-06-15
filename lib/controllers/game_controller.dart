@@ -176,14 +176,46 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   double getHorseStatUpgradeCost(int tier, int level, String statId) {
-    double baseGold = (statId == 'speed' || statId == 'stamina') ? 300.0 : 200.0;
+    double baseGold = 100.0;
+    const double costMultiplier = 1.15;
+    
+    switch (statId) {
+      case 'stamina':
+        baseGold = 30.0;
+        break;
+      case 'focus':
+        baseGold = 40.0;
+        break;
+      case 'cornering':
+        baseGold = 50.0;
+        break;
+      case 'speed':
+        baseGold = 100.0;
+        break;
+      case 'acceleration':
+        baseGold = 70.0;
+        break;
+      case 'temper':
+        baseGold = 85.0;
+        break;
+    }
+    
     int relativeLevel = math.max(0, level - 1);
-    return baseGold * _getLeagueModifier(tier) * math.pow(1.15, relativeLevel);
+    return baseGold * _getLeagueModifier(tier) * math.pow(costMultiplier, relativeLevel);
   }
 
   double getJockeySkillUpgradeCost(int tier, int level, String skillId) {
-    double baseGold = (skillId == 'pacing') ? 300.0 : 200.0;
-    return baseGold * _getLeagueModifier(tier) * math.pow(1.15, level);
+    double baseGold = 200.0;
+    switch (skillId) {
+      case 'reflex': baseGold = 200.0; break;
+      case 'balance': baseGold = 200.0; break;
+      case 'tactics': baseGold = 200.0; break;
+      case 'control': baseGold = 300.0; break;
+      case 'condition': baseGold = 250.0; break;
+      case 'motivation': baseGold = 150.0; break;
+    }
+    int relativeLevel = math.max(0, level - 1);
+    return baseGold * _getLeagueModifier(tier) * math.pow(1.15, relativeLevel);
   }
 
   String getDerbyName(int tier) {
@@ -334,7 +366,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       leagueTier: savedLeague,
       leaguePoints: 0.0,
       winChance: initialWinChance,
-      goldPerSecond: 0.0,
+      goldPerSecond: 1.0,
       horsePositions: List.filled(initCount, 0.0),
       raceTimeLeft: 450,
       raceDurationSeconds: 45,
@@ -400,8 +432,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     final ranks = List<int>.filled(count, 0);
     final roll = random.nextDouble() * 100.0;
     final List<int> allRanks = List.generate(count, (i) => i + 1);
-    final bool canWin1st = winChance > 0.25;
-    if (canWin1st && roll < winChance * 100.0) {
+    if (winChance >= 0.35 && roll < winChance * 100.0) {
       ranks[0] = 1;
       final otherRanks = allRanks.sublist(1)..shuffle(random);
       for (int i = 1; i < count; i++) {
@@ -428,6 +459,8 @@ class GameNotifier extends Notifier<GameStateModel> {
     _tickCount++;
     final now = _currentTrustedTime;
     final random = math.Random();
+    int currentDiamonds = state.diamonds;
+    int nextDurationSeconds = state.raceDurationSeconds;
 
     // 1. Decrement boost time left every 10 ticks (1 second)
     int currentBoostTime = state.boostTimeLeft;
@@ -620,20 +653,17 @@ class GameNotifier extends Notifier<GameStateModel> {
 
         final int playerRank = actualRanks[0];
 
-        // Class D reward matrix: 1st=500, 2nd=400, 3rd=300, 4th=200, 5th=100
-        double baseGold = 100.0;
+        double goldEarned;
         if (playerRank == 1) {
-          baseGold = 500.0;
-        } else if (playerRank == 2) {
-          baseGold = 400.0;
-        } else if (playerRank == 3) {
-          baseGold = 300.0;
-        } else if (playerRank == 4) {
-          baseGold = 200.0;
+          goldEarned = 500.0 * math.pow(10.0, state.leagueTier) * vipMultiplier * boostMultiplier;
+        } else {
+          goldEarned = 10.0 * passiveGoldSec;
         }
-
-        double goldEarned = baseGold * math.pow(10.0, state.leagueTier) * boostMultiplier;
         currentGold += goldEarned;
+
+        if (playerRank == 1 || playerRank == 2) {
+          currentDiamonds += 1;
+        }
 
         double pointsForRank(int rank) {
           if (rank == 1) return 30.0;
@@ -666,7 +696,8 @@ class GameNotifier extends Notifier<GameStateModel> {
         if (currentSeasonRaceNum < matchCap) {
           currentSeasonRaceNum += 1;
           currentRaceState = 'racing';
-          currentRaceTimeLeft = 450;
+          nextDurationSeconds = 38 + random.nextInt(8);
+          currentRaceTimeLeft = nextDurationSeconds * 10;
           currentPositions = List.filled(state.horsePositions.length, 0.0);
           currentPlayerGate = random.nextInt(state.horsePositions.length);
           currentRivalNames = state.currentRaceRivalNames;
@@ -722,7 +753,8 @@ class GameNotifier extends Notifier<GameStateModel> {
           currentRivalNames = newRivals;
           currentSeasonRaceNum = 1;
           currentRaceState = 'racing';
-          currentRaceTimeLeft = 450;
+          nextDurationSeconds = 38 + random.nextInt(8);
+          currentRaceTimeLeft = nextDurationSeconds * 10;
           currentPositions = List.filled(nextHorseCount, 0.0);
           nextRanks = nextRanksPerm;
           currentPlayerGate = random.nextInt(nextHorseCount);
@@ -732,11 +764,13 @@ class GameNotifier extends Notifier<GameStateModel> {
 
     state = state.copyWith(
       gold: currentGold,
+      diamonds: currentDiamonds,
       boostTimeLeft: currentBoostTime,
       sponsorActive: currentSponsorActive,
       sponsorPosition: currentSponsorPos,
       raceState: currentRaceState,
       raceTimeLeft: currentRaceTimeLeft,
+      raceDurationSeconds: nextDurationSeconds,
       resultsCountdown: currentResultsCountdown,
       horsePositions: currentPositions,
       lastRaceGoldEarned: lastRaceGold,
@@ -794,7 +828,13 @@ class GameNotifier extends Notifier<GameStateModel> {
     final double vipMultiplier = hasVip ? 2.0 : 1.0;
     final double boostMultiplier = state.boostTimeLeft > 0 ? 2.0 : 1.0;
     final double passiveGoldSec = state.goldPerSecond * math.pow(10.0, state.leagueTier) * vipMultiplier * boostMultiplier;
-    return math.max(60.0 * passiveGoldSec, state.gold * 0.10);
+    
+    if (passiveGoldSec < 30.0) {
+      final rand = math.Random();
+      return 5000.0 + rand.nextInt(1001); // 5-6k coin
+    } else {
+      return passiveGoldSec * 300.0; // saniyelik gelirin 300s çarpılmışı
+    }
   }
 
   void claimSponsorReward() {
@@ -1175,12 +1215,12 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   bool buyPremiumHorse(int tier) {
     if (tier < 0 || tier >= state.horses.length) return false;
-    final cost = (tier + 1) * 30;
+    final cost = tier == 5 ? 1500 : (tier + 1) * 30;
     if (state.diamonds >= cost) {
       final oldHorse = state.horses[tier];
-      if (oldHorse.currentStars > 0) return false; // Already unlocked
+      if (oldHorse.currentStars > 0.0) return false; // Already unlocked
 
-      final double starValue = tier == 7 ? 5.0 : 1.0 + tier * 0.5;
+      final double starValue = tier == 5 ? 6.0 : (tier + 1).toDouble();
       final newHorse = oldHorse.copyWith(
         currentStars: starValue,
       );
@@ -1200,12 +1240,12 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   int getNextNeededHorseTier() {
-    for (int i = 0; i < state.horses.length; i++) {
+    for (int i = 0; i <= 4; i++) {
       if (state.horses[i].currentStars == 0.0) {
         return i;
       }
     }
-    return state.horses.length - 1;
+    return 4;
   }
 
   void addHorseFragments(int tier, int amount) {
@@ -1215,7 +1255,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     double newStars = oldHorse.currentStars;
     
     if (newStars == 0.0 && newFragments >= 20) {
-      newStars = tier == 7 ? 5.0 : 1.0 + tier * 0.5; // Unlock the horse AVD tier!
+      newStars = tier == 5 ? 6.0 : (tier + 1).toDouble(); // Unlock the horse!
     }
     
     final newHorse = oldHorse.copyWith(
@@ -1284,8 +1324,8 @@ class GameNotifier extends Notifier<GameStateModel> {
       }
       
       int targetTier = currentNeededTier + selectedOffset;
-      if (targetTier >= state.horses.length) {
-        targetTier = state.horses.length - 1;
+      if (targetTier >= 5) {
+        targetTier = 4;
       }
       
       final amount = 3 + rand.nextInt(3); 
@@ -1302,59 +1342,22 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   List<double> getStandardChestDropRates() {
-    int tCurrent = state.unlockedLeagueTier; // 0 to 7
-    List<double> weights = List.filled(8, 0.0);
-    
-    if (tCurrent >= 7) {
-      return List.filled(8, 12.5);
+    List<double> weights = List.filled(6, 0.0);
+    List<int> lockedTiers = [];
+    for (int i = 0; i <= 4; i++) {
+      if (state.horses[i].currentStars == 0.0) {
+        lockedTiers.add(i);
+      }
     }
     
-    int next1 = tCurrent + 1;
-    int next2 = tCurrent + 2;
-    int next3 = tCurrent + 3;
-    
-    List<int> farTiers = [];
-    for (int i = tCurrent + 4; i <= tCurrent + 6; i++) {
-      if (i < 7) farTiers.add(i);
-    }
-    
-    int endgame = 7;
-    
-    double weightNext1 = 55.0;
-    double weightNext2 = 25.0;
-    double weightNext3 = 12.0;
-    double weightFar = 7.5;
-    double weightEndgame = 0.5;
-    
-    if (next1 <= 7) weights[next1] = weightNext1;
-    if (next2 <= 7) weights[next2] = weightNext2;
-    if (next3 <= 7) weights[next3] = weightNext3;
-    
-    if (farTiers.isNotEmpty) {
-      double perFar = weightFar / farTiers.length;
-      for (int t in farTiers) {
-        weights[t] = perFar;
+    if (lockedTiers.isNotEmpty) {
+      double rate = 100.0 / lockedTiers.length;
+      for (int t in lockedTiers) {
+        weights[t] = rate;
       }
     } else {
-      if (next1 <= 7) weights[next1] += weightFar * 0.5;
-      if (next2 <= 7) weights[next2] += weightFar * 0.5;
-    }
-    
-    weights[endgame] = weightEndgame;
-    
-    final bool allUnlocked = state.horses.every((h) => h.currentStars > 0.0);
-    if (!allUnlocked) {
-      for (int i = 0; i < weights.length; i++) {
-        if (state.horses[i].currentStars > 0.0) {
-          weights[i] = 0.0;
-        }
-      }
-    }
-    
-    double sum = weights.reduce((a, b) => a + b);
-    if (sum > 0) {
-      for (int i = 0; i < weights.length; i++) {
-        weights[i] = (weights[i] / sum) * 100.0;
+      for (int i = 0; i <= 4; i++) {
+        weights[i] = 20.0;
       }
     }
     return weights;
@@ -1370,7 +1373,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         return i;
       }
     }
-    return 7;
+    return 0;
   }
 
   Map<String, dynamic>? openStandardChest1xTicket() {
@@ -1415,70 +1418,21 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   List<double> getRareChestDropRates() {
-    int tCurrent = state.unlockedLeagueTier; // 0 to 7
-    List<double> weights = List.filled(8, 0.0);
-    
-    if (tCurrent >= 7) {
-      return List.filled(8, 12.5);
+    List<double> weights = List.filled(6, 0.0);
+    List<int> lockedTiers = [];
+    for (int i = 0; i <= 4; i++) {
+      if (state.horses[i].currentStars == 0.0) {
+        lockedTiers.add(i);
+      }
     }
-    
-    int next1 = tCurrent + 1;
-    int next2 = tCurrent + 2;
-    
-    List<int> midTiers = [];
-    for (int i = tCurrent + 3; i <= tCurrent + 5; i++) {
-      if (i < 7) midTiers.add(i);
-    }
-    
-    List<int> highTiers = [];
-    if (tCurrent + 6 < 7) {
-      highTiers.add(tCurrent + 6);
-    }
-    
-    int endgame = 7;
-    
-    double weightNext1 = 35.0;
-    double weightNext2 = 30.0;
-    double weightMid = 25.0;
-    double weightHigh = 8.0;
-    double weightEndgame = 2.0;
-    
-    if (next1 <= 7) weights[next1] = weightNext1;
-    if (next2 <= 7) weights[next2] = weightNext2;
-    
-    if (midTiers.isNotEmpty) {
-      double perMid = weightMid / midTiers.length;
-      for (int t in midTiers) {
-        weights[t] = perMid;
+    if (lockedTiers.isNotEmpty) {
+      double rate = 100.0 / lockedTiers.length;
+      for (int t in lockedTiers) {
+        weights[t] = rate;
       }
     } else {
-      if (next1 <= 7) weights[next1] += weightMid * 0.5;
-      if (next2 <= 7) weights[next2] += weightMid * 0.5;
-    }
-    
-    if (highTiers.isNotEmpty) {
-      for (int t in highTiers) {
-        weights[t] = weightHigh;
-      }
-    } else {
-      if (next2 <= 7) weights[next2] += weightHigh;
-    }
-    
-    weights[endgame] = weightEndgame;
-    
-    final bool allUnlocked = state.horses.every((h) => h.currentStars > 0.0);
-    if (!allUnlocked) {
-      for (int i = 0; i < weights.length; i++) {
-        if (state.horses[i].currentStars > 0.0) {
-          weights[i] = 0.0;
-        }
-      }
-    }
-    
-    double sum = weights.reduce((a, b) => a + b);
-    if (sum > 0) {
-      for (int i = 0; i < weights.length; i++) {
-        weights[i] = (weights[i] / sum) * 100.0;
+      for (int i = 0; i <= 4; i++) {
+        weights[i] = 20.0;
       }
     }
     return weights;
@@ -1494,7 +1448,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         return i;
       }
     }
-    return 7;
+    return 0;
   }
 
   Map<String, dynamic>? openNadirChest1xDiamonds() {
@@ -1541,33 +1495,26 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   bool buyPremiumJockey(int tier) {
-    const int cost = 15; // 15 Diamonds
+    if (tier < 0 || tier >= state.jockeys.length) return false;
+    final cost = tier == 5 ? 1500 : (tier + 1) * 30;
     if (state.diamonds >= cost) {
-      final random = math.Random();
-      final names = [
-        'Legendary Luke', 'Master Maverick', 'Apex Rider', 
-        'Star Whisperer', 'Shadow Racer', 'Crown Prince',
-        'Elmas Jokey', 'Fırtına Süvarisi'
-      ];
-      final name = names[random.nextInt(names.length)];
-      final newJockey = JockeyAsset(
-        id: 'j_prem_${_currentTrustedTime.microsecondsSinceEpoch}',
-        name: name,
-        associatedLeagueTier: tier,
-        currentStars: 5,
-        duplicateCardCount: 0,
-        skills: const {
-          'tactics': 0,
-          'pacing': 0,
-          'reflexes': 0,
-        },
+      final oldJockey = state.jockeys[tier];
+      if (oldJockey.currentStars > 0.0) return false; // Already unlocked
+
+      final double starValue = tier == 5 ? 6.0 : (tier + 1).toDouble();
+      final newJockey = oldJockey.copyWith(
+        currentStars: starValue,
       );
-      final newJockeys = List<JockeyAsset>.from(state.jockeys)..add(newJockey);
+
+      final newJockeys = List<JockeyAsset>.from(state.jockeys);
+      newJockeys[tier] = newJockey;
+
       state = state.copyWith(
         diamonds: state.diamonds - cost,
         jockeys: newJockeys,
         lastSaved: _currentTrustedTime,
       );
+      _updateWinChance();
       return true;
     }
     return false;
@@ -1738,9 +1685,10 @@ class GameNotifier extends Notifier<GameStateModel> {
     if (isHorse) {
       final horse = state.horses[index];
       if (horse.duplicateCardCount >= 5) {
+        final double starValue = index == 5 ? 6.0 : (index + 1).toDouble();
         final updatedHorse = horse.copyWith(
           duplicateCardCount: horse.duplicateCardCount - 5,
-          currentStars: math.min(5.0, horse.currentStars + 0.5),
+          currentStars: starValue,
         );
         final newHorses = List<HorseAsset>.from(state.horses);
         newHorses[index] = updatedHorse;
@@ -1770,9 +1718,10 @@ class GameNotifier extends Notifier<GameStateModel> {
     } else {
       final jockey = state.jockeys[index];
       if (jockey.duplicateCardCount >= 5) {
+        final double starValue = index == 5 ? 6.0 : (index + 1).toDouble();
         final updatedJockey = jockey.copyWith(
           duplicateCardCount: jockey.duplicateCardCount - 5,
-          currentStars: math.min(5.0, jockey.currentStars + 0.5),
+          currentStars: starValue,
         );
         final newJockeys = List<JockeyAsset>.from(state.jockeys);
         newJockeys[index] = updatedJockey;
@@ -1936,7 +1885,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         final random = math.Random();
         for (int i = 0; i < 5; i++) {
           final isHorseCard = random.nextBool();
-          final int tier = random.nextInt(state.leagueTier + 1);
+          final int tier = random.nextInt(math.min(state.leagueTier + 1, 5));
           if (isHorseCard) {
             final horse = state.horses[tier];
             newHorses[tier] = horse.copyWith(
@@ -1965,7 +1914,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         final random = math.Random();
         for (int i = 0; i < 5; i++) {
           final isHorseCard = random.nextBool();
-          final int tier = random.nextInt(state.leagueTier + 1);
+          final int tier = random.nextInt(math.min(state.leagueTier + 1, 5));
           if (isHorseCard) {
             final horse = state.horses[tier];
             newHorses[tier] = horse.copyWith(
@@ -2232,7 +2181,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     int classIdx = 0,
   }) {
     if (tier >= horses.length || tier >= jockeys.length) {
-      return 0.20;
+      return 0.12;
     }
     final activeHorse = horses[tier];
     final activeJockey = jockeys[tier];
@@ -2241,37 +2190,54 @@ class GameNotifier extends Notifier<GameStateModel> {
     activeHorse.stats.forEach((key, level) {
       int baseVal = 0;
       switch (key) {
-        case 'speed': baseVal = 20; break;
-        case 'stamina': baseVal = 20; break;
-        case 'acceleration': baseVal = 15; break;
-        case 'focus': baseVal = 15; break;
-        case 'cornering': baseVal = 10; break;
-        case 'temper': baseVal = 20; break;
+        case 'speed': baseVal = 10; break;
+        case 'stamina': baseVal = 10; break;
+        case 'acceleration': baseVal = 8; break;
+        case 'focus': baseVal = 8; break;
+        case 'cornering': baseVal = 4; break;
+        case 'temper': baseVal = 10; break;
       }
       horseStatsSum += baseVal + (level - 1) * 3;
     });
 
     int jockeySkillsSum = 0;
     activeJockey.skills.forEach((key, level) {
-      if (key == 'pacing') {
-        jockeySkillsSum += level * 3;
-      } else {
-        jockeySkillsSum += level * 2;
+      int baseVal = 0;
+      switch (key) {
+        case 'reflex': baseVal = 10; break;
+        case 'balance': baseVal = 10; break;
+        case 'tactics': baseVal = 8; break;
+        case 'control': baseVal = 8; break;
+        case 'condition': baseVal = 8; break;
+        case 'motivation': baseVal = 6; break;
       }
+      jockeySkillsSum += baseVal + (level - 1) * 3;
     });
 
-    // Calculate Total Power: (Horse Stats Sum + Horse Star Coefficient) + (Jockey Skills Sum + Jockey Star Coefficient)
-    int horseTotalPower = horseStatsSum + (activeHorse.currentStars * 100).toInt();
-    int jockeyTotalPower = jockeySkillsSum + (activeJockey.currentStars * 100).toInt();
+    int getStarBonus(double stars) {
+      if (stars == 6.0) return 10000;
+      if (stars == 5.0) return 6000;
+      if (stars == 4.0) return 2000;
+      if (stars == 3.0) return 650;
+      if (stars == 2.0) return 225;
+      return 0;
+    }
+    int horseTotalPower = horseStatsSum + getStarBonus(activeHorse.currentStars);
+    int jockeyTotalPower = jockeySkillsSum + getStarBonus(activeJockey.currentStars);
     int totalPower = horseTotalPower + jockeyTotalPower;
 
-    // Calculate Division Base Difficulty
-    final difficulties = [800.0, 3600.0, 21600.0, 147600.0, 1254600.0];
-    double baseDifficulty = difficulties[classIdx.clamp(0, difficulties.length - 1)];
-    double divisionBaseDifficulty = baseDifficulty * math.pow(4.0, tier);
-
-    // Calculate base win chance using the diminishing returns formula
-    double baseWinChance = totalPower / (totalPower + divisionBaseDifficulty);
+    double L = 1000.0;
+    switch (classIdx) {
+      case 0: L = 1000.0; break;
+      case 1: L = 3000.0; break;
+      case 2: L = 9000.0; break;
+      case 3: L = 27000.0; break;
+      case 4: L = 81000.0; break;
+      default: L = 1000.0;
+    }
+    double P = math.max(1.0, totalPower.toDouble());
+    double winRate = 95.0 + 83.0 * (math.log(P / L) / math.ln10);
+    double baseWinChance = winRate.clamp(12.0, 95.0) / 100.0;
 
     // Calculate equipment contribution
     double equipmentBonus = 0.0;
@@ -2287,7 +2253,7 @@ class GameNotifier extends Notifier<GameStateModel> {
   }
 
   double _calculateGoldPerSecond(Map<String, int> buildings) {
-    double total = 0.0;
+    double total = 1.0;
     final trackLevel = buildings['training_track'] ?? 0;
     final medicalLevel = buildings['medical_center'] ?? 0;
     final storageLevel = buildings['feed_storage'] ?? 0;
@@ -2450,14 +2416,15 @@ class GameNotifier extends Notifier<GameStateModel> {
     final newRivals = _pickRaceRivalNames(rand, count: cnt - 1);
     final initialRanks = _rollRaceRanks(freshWinChance, rand, count: cnt);
 
+    final int resetDuration = 38 + rand.nextInt(8);
     state = GameStateModel.initial().copyWith(
       winChance: freshWinChance,
       leagueTier: 0,
       currentClassIndex: 0,
       unlockedLeagueTier: 0,
       horsePositions: List.filled(cnt, 0.0),
-      raceTimeLeft: 450,
-      raceDurationSeconds: 45,
+      raceTimeLeft: resetDuration * 10,
+      raceDurationSeconds: resetDuration,
       raceState: 'racing',
       playerGateNumber: rand.nextInt(cnt),
       currentRaceRivalNames: newRivals,
@@ -2517,6 +2484,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     final nextRanks = _rollRaceRanks(newWinChance, math.Random(), count: cnt);
     final newRivals = _pickRaceRivalNames(math.Random(), count: cnt - 1);
     
+    final int initDuration = 38 + math.Random().nextInt(8);
     _leagueStates[tier] = {
       'currentClassIndex': 0,
       'currentSeasonRace': 1,
@@ -2524,7 +2492,7 @@ class GameNotifier extends Notifier<GameStateModel> {
       'rivalSeasonPoints': List.filled(cnt - 1, 0.0),
       'recentPlacements': <int>[],
       'horsePositions': List.filled(cnt, 0.0),
-      'raceTimeLeft': 450,
+      'raceTimeLeft': initDuration * 10,
       'raceState': 'racing',
       'raceRanks': nextRanks,
       'currentRaceRivalNames': newRivals,
@@ -2561,9 +2529,8 @@ class GameNotifier extends Notifier<GameStateModel> {
     
     // 1. Simulate placement
     final double roll = rand.nextDouble() * 100.0;
-    final bool canWin1st = winChance > 0.25;
     int playerRank = 1;
-    if (!canWin1st || roll >= winChance * 100.0) {
+    if (roll >= winChance * 100.0) {
       playerRank = rand.nextInt(cnt - 1) + 2;
     }
     
@@ -2589,21 +2556,17 @@ class GameNotifier extends Notifier<GameStateModel> {
     }
     leagueState['rivalSeasonPoints'] = rivalPoints;
     
-    double baseGold = 100.0;
-    if (playerRank == 1) {
-      baseGold = 500.0;
-    } else if (playerRank == 2) {
-      baseGold = 400.0;
-    } else if (playerRank == 3) {
-      baseGold = 300.0;
-    } else if (playerRank == 4) {
-      baseGold = 200.0;
-    }
-    
     final bool hasVip = currentGameState.equippedEquipment['vip_pass'] == 'active';
     final double vipMultiplier = hasVip ? 2.0 : 1.0;
     final double boostMultiplier = currentGameState.boostTimeLeft > 0 ? 2.0 : 1.0;
-    double goldEarned = baseGold * math.pow(10.0, tier) * vipMultiplier * boostMultiplier;
+    
+    double goldEarned;
+    if (playerRank == 1) {
+      goldEarned = 500.0 * math.pow(10.0, tier) * vipMultiplier * boostMultiplier;
+    } else {
+      final double passiveGoldSec = currentGameState.goldPerSecond * math.pow(10.0, tier) * vipMultiplier * boostMultiplier;
+      goldEarned = 10.0 * passiveGoldSec;
+    }
     
     final List<int> recent = List<int>.from((leagueState['recentPlacements'] as List? ?? []).cast<int>());
     recent.insert(0, playerRank);
@@ -2715,6 +2678,7 @@ class GameNotifier extends Notifier<GameStateModel> {
 
     _finishedHorses.clear();
 
+    final int debugDuration = 38 + math.Random().nextInt(8);
     state = state.copyWith(
       currentClassIndex: nextClassIndex,
       leagueTier: nextLeagueTier,
@@ -2727,7 +2691,8 @@ class GameNotifier extends Notifier<GameStateModel> {
       currentRaceRivalNames: newRivals,
       currentSeasonRace: 1,
       raceState: 'racing',
-      raceTimeLeft: 450,
+      raceTimeLeft: debugDuration * 10,
+      raceDurationSeconds: debugDuration,
       horsePositions: List.filled(count, 0.0),
       raceRanks: nextRanks,
       lastSaved: _currentTrustedTime,
