@@ -54,6 +54,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
         _commentaryLogs.clear();
         _commentaryLogs.add(AppStrings.get(locale, 'commentary_ready'));
       });
+      ref.read(audioServiceProvider).startBgm(ref);
     });
   }
 
