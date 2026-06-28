@@ -1093,21 +1093,65 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () {
-                        sharedPrefs.clear();
-                        ref.read(gameProvider.notifier).resetGame();
-                        ref.read(localeProvider.notifier).update((s) => 'en');
-                        ref.read(soundEnabledProvider.notifier).update((s) => true);
-                        ref.read(musicEnabledProvider.notifier).update((s) => true);
-                        ref.read(vibrateEnabledProvider.notifier).update((s) => true);
-                        setState(() {
-                          _commentaryLogs.clear();
-                          _commentaryLogs.add(AppStrings.get('en', 'commentary_ready'));
-                          _offlineDialogShown = false;
-                          _selectedHorseIndex = 0;
-                          _selectedJockeyIndex = 0;
-                          _lastTickHorseOrder = null;
-                        });
-                        Navigator.pop(ctx);
+                        showDialog(
+                          context: ctx,
+                          builder: (confirmCtx) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            title: Row(
+                              children: [
+                                const Text('⚠️ ', style: TextStyle(fontSize: 20)),
+                                Text(
+                                  locale == 'tr' ? 'Oyunu Sıfırla' : 'Reset Game',
+                                  style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            content: Text(
+                              locale == 'tr'
+                                  ? 'Tüm ilerlemeniz, altınlarınız, atlarınız ve tesisleriniz kalıcı olarak silinecektir.\n\nDevam etmek istediğinize emin misiniz?'
+                                  : 'All your progress, gold, horses, and facilities will be permanently deleted.\n\nAre you sure you want to proceed?',
+                              style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: AppTheme.charcoalBrown),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(confirmCtx),
+                                child: Text(
+                                  locale == 'tr' ? 'Vazgeç' : 'Cancel',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.mutedBrown),
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(confirmCtx); // Close warning dialog
+                                  sharedPrefs.clear();
+                                  ref.read(gameProvider.notifier).resetGame();
+                                  ref.read(localeProvider.notifier).update((s) => 'en');
+                                  ref.read(soundEnabledProvider.notifier).update((s) => true);
+                                  ref.read(musicEnabledProvider.notifier).update((s) => true);
+                                  ref.read(vibrateEnabledProvider.notifier).update((s) => true);
+                                  setState(() {
+                                    _commentaryLogs.clear();
+                                    _commentaryLogs.add(AppStrings.get('en', 'commentary_ready'));
+                                    _offlineDialogShown = false;
+                                    _selectedHorseIndex = 0;
+                                    _selectedJockeyIndex = 0;
+                                    _lastTickHorseOrder = null;
+                                  });
+                                  Navigator.pop(ctx); // Close settings dialog
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.salmonPink,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: Text(
+                                  locale == 'tr' ? 'Evet, Sıfırla' : 'Yes, Reset',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.salmonPink,
