@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../localization/app_strings.dart';
 import '../localization/locale_provider.dart';
 import '../main.dart';
+import '../services/audio_service.dart';
 import 'market_screen.dart';
 
 class MainGameScreen extends ConsumerStatefulWidget {
@@ -1061,6 +1062,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       isActive: soundEnabled,
                       onTap: () {
                         ref.read(soundEnabledProvider.notifier).update((state) => !state);
+                        ref.read(audioServiceProvider).playClick(ref);
                       },
                     ),
 
@@ -1071,6 +1073,8 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       isActive: musicEnabled,
                       onTap: () {
                         ref.read(musicEnabledProvider.notifier).update((state) => !state);
+                        ref.read(audioServiceProvider).playClick(ref);
+                        ref.read(audioServiceProvider).updateBgmState(ref);
                       },
                     ),
 
@@ -1081,6 +1085,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       isActive: vibrateEnabled,
                       onTap: () {
                         ref.read(vibrateEnabledProvider.notifier).update((state) => !state);
+                        ref.read(audioServiceProvider).triggerVibration(ref, type: HapticType.medium);
                       },
                     ),
 
@@ -1166,16 +1171,19 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
 
     final notifier = ref.read(gameProvider.notifier);
     notifier.upgradeHorseStat(realIndex, statId);
+    ref.read(audioServiceProvider).playUpgrade(ref);
   }
 
   void _upgradeJockeySkill(int jockeyIndex, String skillId) {
     final notifier = ref.read(gameProvider.notifier);
     notifier.upgradeJockeySkill(jockeyIndex, skillId);
+    ref.read(audioServiceProvider).playUpgrade(ref);
   }
 
   void _upgradeBuilding(String buildingId) {
     final notifier = ref.read(gameProvider.notifier);
     notifier.upgradeBuilding(buildingId);
+    ref.read(audioServiceProvider).playUpgrade(ref);
   }
 
   void _showNameEditDialog(bool isHorse, int tier) {
