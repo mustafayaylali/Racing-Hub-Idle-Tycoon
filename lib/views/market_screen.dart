@@ -17,10 +17,10 @@ class MarketScreen extends ConsumerStatefulWidget {
 class _MarketScreenState extends ConsumerState<MarketScreen> {
   Timer? _timer;
   bool _adLoading = false;
-
   @override
   void initState() {
     super.initState();
+
     // Refresh countdown timer every second
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
@@ -103,12 +103,14 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
   }
 
   double roundDownToTensUnit(double value) {
-    if (value <= 10.0) return value.floorToDouble();
-    double factor = 10.0;
-    while (factor * 10.0 <= value) {
+    if (value <= 100.0) return value.floorToDouble();
+    double factor = 1.0;
+    double temp = value;
+    while (temp >= 100.0) {
+      temp /= 10.0;
       factor *= 10.0;
     }
-    return (value / factor).floorToDouble() * factor;
+    return temp.floorToDouble() * factor;
   }
 
   void _watchAdForDiamonds(BuildContext context, GameNotifier notifier, String locale) {
@@ -245,6 +247,7 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
     double coinsAmount,
     int diamondCost,
     String emoji,
+    String durationLabel,
     String locale,
     GameStateModel gameState,
   ) {
@@ -283,7 +286,12 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 2),
+            Text(
+              durationLabel,
+              style: const TextStyle(fontFamily: 'Outfit', fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.mutedBrown),
+            ),
+            const SizedBox(height: 6),
             ElevatedButton(
               onPressed: canAfford
                   ? () {
@@ -612,10 +620,14 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
     final notifier = ref.read(gameProvider.notifier);
     final locale = ref.watch(localeProvider);
 
-    final double cCurrent = gameState.gold;
-    final double pack1Coins = math.max(100.0, (cCurrent / 8.0).floorToDouble());
-    final double pack2Coins = math.max(500.0, roundDownToTensUnit(cCurrent / 2.0));
-    final double pack3Coins = math.max(1000.0, roundDownToTensUnit(cCurrent));
+    final bool hasVip = gameState.equippedEquipment['vip_pass'] == 'active';
+    final double vipMultiplier = hasVip ? 2.0 : 1.0;
+    final double boostMultiplier = gameState.boostTimeLeft > 0 ? 2.0 : 1.0;
+    final double passiveGoldSec = gameState.goldPerSecond * math.pow(10.0, gameState.leagueTier) * vipMultiplier * boostMultiplier;
+
+    final double pack1Coins = math.max(1000.0, roundDownToTensUnit(passiveGoldSec * 1800));
+    final double pack2Coins = math.max(5000.0, roundDownToTensUnit(passiveGoldSec * 7200));
+    final double pack3Coins = math.max(15000.0, roundDownToTensUnit(passiveGoldSec * 18000));
 
     return Scaffold(
       appBar: AppBar(
@@ -893,11 +905,11 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildCoinPack(context, notifier, 1, pack1Coins, 10, '🪙', locale, gameState),
+                    _buildCoinPack(context, notifier, 1, pack1Coins, 10, '🪙', locale == 'tr' ? '30 Dk Üretim' : '30m Income', locale, gameState),
                     const SizedBox(width: 8),
-                    _buildCoinPack(context, notifier, 2, pack2Coins, 30, '💰', locale, gameState),
+                    _buildCoinPack(context, notifier, 2, pack2Coins, 30, '💰', locale == 'tr' ? '2 Saat Üretim' : '2h Income', locale, gameState),
                     const SizedBox(width: 8),
-                    _buildCoinPack(context, notifier, 3, pack3Coins, 50, '🏆', locale, gameState),
+                    _buildCoinPack(context, notifier, 3, pack3Coins, 50, '🏆', locale == 'tr' ? '5 Saat Üretim' : '5h Income', locale, gameState),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -912,9 +924,9 @@ class _MarketScreenState extends ConsumerState<MarketScreen> {
                   children: [
                     _buildTicketAdPack(context, notifier, locale),
                     const SizedBox(width: 8),
-                    _buildTicketPurchasePack(context, notifier, 1, 10, locale, gameState),
+                    _buildTicketPurchasePack(context, notifier, 3, 10, locale, gameState),
                     const SizedBox(width: 8),
-                    _buildTicketPurchasePack(context, notifier, 5, 45, locale, gameState),
+                    _buildTicketPurchasePack(context, notifier, 20, 50, locale, gameState),
                   ],
                 ),
               ],

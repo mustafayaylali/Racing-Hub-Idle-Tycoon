@@ -471,14 +471,22 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
   }
 
   void _showSponsorAdDialog(GameNotifier notifier) {
+    final gameState = ref.read(gameProvider);
     final locale = ref.read(localeProvider);
+    final bool isMega = gameState.sponsorIsMega;
     final double rewardGold = notifier.getSponsorRewardGold();
     final String formattedReward = AppStrings.formatGold(rewardGold);
 
-    final String title = locale == 'tr' ? '🎁 Sponsor Teklifi!' : '🎁 Sponsor Offer!';
-    final String message = locale == 'tr'
-        ? 'Bir premium sponsor size özel bir altın desteği vermek istiyor! Bu ödülü almak için kısa bir video izleyin.'
-        : 'A premium sponsor wants to grant you a special gold boost! Watch a short video to claim this reward.';
+    final String title = isMega
+        ? (locale == 'tr' ? '🌟 MEGA SPONSOR TEKLİFİ! 🌟' : '🌟 MEGA SPONSOR OFFER! 🌟')
+        : (locale == 'tr' ? '🎁 Sponsor Teklifi!' : '🎁 Sponsor Offer!');
+    final String message = isMega
+        ? (locale == 'tr'
+            ? 'Şanslı günündesin! Bir VIP Mega Sponsor sana muazzam bir destek paketi teklif ediyor (10 Dk Altın veya 5 Elmas)!'
+            : 'Lucky day! A VIP Mega Sponsor offers you a massive boost package (10m Gold or 5 Diamonds)!')
+        : (locale == 'tr'
+            ? 'Bir premium sponsor size özel bir altın desteği vermek istiyor! Bu ödülü almak için kısa bir video izleyin.'
+            : 'A premium sponsor wants to grant you a special gold boost! Watch a short video to claim this reward.');
     final String claimBtnText = locale == 'tr' ? 'İzle & Al' : 'Watch & Claim';
     final String cancelBtnText = locale == 'tr' ? 'Teklifi Reddet' : 'Decline Offer';
 
@@ -1157,50 +1165,222 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     final realIndex = gameState.horses.indexWhere((h) => h.id == horse.id);
 
     final notifier = ref.read(gameProvider.notifier);
-    final success = notifier.upgradeHorseStat(realIndex, statId);
-    if (!success) {
-      final locale = ref.read(localeProvider);
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.get(locale, 'not_enough_gold')),
-          backgroundColor: AppTheme.salmonPink,
-          duration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    notifier.upgradeHorseStat(realIndex, statId);
   }
 
   void _upgradeJockeySkill(int jockeyIndex, String skillId) {
     final notifier = ref.read(gameProvider.notifier);
-    final success = notifier.upgradeJockeySkill(jockeyIndex, skillId);
-    if (!success) {
-      final locale = ref.read(localeProvider);
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.get(locale, 'not_enough_gold')),
-          backgroundColor: AppTheme.salmonPink,
-          duration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    notifier.upgradeJockeySkill(jockeyIndex, skillId);
   }
 
   void _upgradeBuilding(String buildingId) {
     final notifier = ref.read(gameProvider.notifier);
-    final success = notifier.upgradeBuilding(buildingId);
-    if (!success) {
-      final locale = ref.read(localeProvider);
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.get(locale, 'not_enough_gold')),
-          backgroundColor: AppTheme.salmonPink,
-          duration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    notifier.upgradeBuilding(buildingId);
+  }
+
+  void _showNameEditDialog(bool isHorse, int tier) {
+    final gameState = ref.read(gameProvider);
+    final locale = ref.read(localeProvider);
+    final String currentName = isHorse
+        ? (tier < gameState.horses.length ? gameState.horses[tier].name : '')
+        : (tier < gameState.jockeys.length ? gameState.jockeys[tier].name : '');
+
+    final TextEditingController textController = TextEditingController(text: currentName);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  isHorse
+                      ? (locale == 'tr' ? 'Atı Yeniden Adlandır' : 'Rename Horse')
+                      : (locale == 'tr' ? 'Jokeyi Yeniden Adlandır' : 'Rename Jockey'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.charcoalBrown,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  maxLength: 20,
+                  style: const TextStyle(
+                    fontFamily: 'Outfit',
+                    color: AppTheme.charcoalBrown,
+                    fontSize: 15,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: currentName,
+                    hintStyle: const TextStyle(color: AppTheme.mutedBrown),
+                    counterText: '',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    filled: true,
+                    fillColor: const Color(0xFFFAF6EE),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFF1EADF), width: 1),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFF1EADF), width: 1),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppTheme.mintGreen, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          locale == 'tr' ? 'İptal' : 'Cancel',
+                          style: const TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.mutedBrown,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final newName = textController.text.trim();
+                          if (newName.isNotEmpty && newName != currentName) {
+                            Navigator.pop(context); // Close edit dialog
+                            _watchAdAndSaveName(isHorse, tier, newName);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.mintGreen,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.ondemand_video_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              locale == 'tr' ? 'Kaydet' : 'Save',
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _watchAdAndSaveName(bool isHorse, int tier, String newName) {
+    final locale = ref.read(localeProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final nav = Navigator.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppTheme.creamBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: AppTheme.mintGreen),
+                const SizedBox(height: 16),
+                Text(
+                  locale == 'tr' ? 'Reklam İzleniyor...' : 'Watching Ad...',
+                  style: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.charcoalBrown,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      if (nav.canPop()) {
+        nav.pop(); // Close ad loading dialog
+      }
+
+      bool success = false;
+      if (isHorse) {
+        success = notifier.renameHorse(tier, newName);
+      } else {
+        success = notifier.renameJockey(tier, newName);
+      }
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              locale == 'tr'
+                  ? 'İsim başarıyla güncellendi!'
+                  : 'Name successfully updated!',
+              style: const TextStyle(fontFamily: 'Outfit'),
+            ),
+            backgroundColor: AppTheme.mintGreen,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 
   void _openLeagueChest(int chestTier, bool withGold) {
@@ -1208,14 +1388,6 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     final result = notifier.openLeagueChest(chestTier, withGold);
     if (result != null) {
       _showLeagueGachaResultDialog(result);
-    } else {
-      final locale = ref.read(localeProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.get(locale, withGold ? 'chest_error_gold' : 'chest_error_diamond')),
-          backgroundColor: AppTheme.salmonPink,
-        ),
-      );
     }
   }
 
@@ -1318,133 +1490,235 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     );
   }
 
-  void _showStandardProbabilityInfoDialog() {
-    final notifier = ref.read(gameProvider.notifier);
-    final rates = notifier.getStandardChestDropRates();
+  void _showProbabilityInfoDialog({required bool isHorse, required bool isRare}) {
     final gameState = ref.read(gameProvider);
     final locale = ref.read(localeProvider);
+
+    double maxStars = 1.0;
+    for (int i = 0; i <= 4; i++) {
+      final currentStars = isHorse 
+          ? gameState.horses[i].currentStars 
+          : gameState.jockeys[i].currentStars;
+      if (currentStars > 0.0) {
+        double stars = (i + 1).toDouble();
+        if (stars > maxStars) {
+          maxStars = stars;
+        }
+      }
+    }
+    int highestStars = maxStars.toInt();
+    if (highestStars > 4) highestStars = 4;
+
+    List<double> displayRates = List.filled(6, 0.0);
+    List<int> displayedTiers = [];
+
+    if (isRare) {
+      if (highestStars == 1) {
+        displayRates[1] = 10.0;
+        displayRates[2] = 20.0;
+        displayRates[3] = 30.0;
+        displayRates[4] = 40.0;
+        displayedTiers = [1, 2, 3, 4];
+      } else if (highestStars == 2) {
+        displayRates[2] = 20.0;
+        displayRates[3] = 35.0;
+        displayRates[4] = 45.0;
+        displayedTiers = [2, 3, 4];
+      } else if (highestStars == 3) {
+        displayRates[3] = 45.0;
+        displayRates[4] = 55.0;
+        displayedTiers = [3, 4];
+      } else {
+        displayRates[4] = 95.0;
+        displayRates[5] = 5.0;
+        displayedTiers = [4, 5];
+      }
+    } else {
+      if (highestStars == 1) {
+        displayRates[1] = 65.0;
+        displayRates[2] = 30.0;
+        displayRates[3] = 4.0;
+        displayRates[4] = 1.0;
+        displayedTiers = [1, 2, 3, 4];
+      } else if (highestStars == 2) {
+        displayRates[2] = 65.0;
+        displayRates[3] = 30.0;
+        displayRates[4] = 5.0;
+        displayedTiers = [2, 3, 4];
+      } else if (highestStars == 3) {
+        displayRates[3] = 90.0;
+        displayRates[4] = 10.0;
+        displayedTiers = [3, 4];
+      } else {
+        displayRates[4] = 95.0;
+        displayRates[5] = 5.0;
+        displayedTiers = [4, 5];
+      }
+    }
+
+    String getHorseEmoji(int idx) {
+      switch (idx) {
+        case 0: return '🐴';
+        case 1: return '🐎';
+        case 2: return '🏇';
+        case 3: return '⚡';
+        case 4: return '🌟';
+        case 5: return '🦄';
+        default: return '🐴';
+      }
+    }
+
+    String getJockeyEmoji(int idx) {
+      switch (idx) {
+        case 0: return '🤠';
+        case 1: return '👩‍🌾';
+        case 2: return '🏎️';
+        case 3: return '🧑‍🚀';
+        case 4: return '🦸';
+        case 5: return '👑';
+        default: return '👨‍🌾';
+      }
+    }
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
+        return Dialog(
           backgroundColor: AppTheme.creamBackground,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(28),
             side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
           ),
-          title: Text(
-            locale == 'tr' ? 'Standart At Parçası Olasılıkları' : 'Standard Horse Fragment Drop Rates',
-            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.charcoalBrown),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(gameState.horses.length, (index) {
-              final horse = gameState.horses[index];
-              final rate = rates[index];
-              final double targetStars = index == 7 ? 5.0 : 1.0 + index * 0.5;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(index == 0 ? '🐴' : index % 2 == 0 ? '🏇' : '🐎', style: const TextStyle(fontSize: 14)),
-                        const SizedBox(width: 4),
-                        Text(
-                          horse.name,
-                          style: const TextStyle(fontSize: 11, fontFamily: 'Outfit', color: AppTheme.charcoalBrown),
+                    Expanded(
+                      child: Text(
+                        isHorse
+                            ? (isRare
+                                ? (locale == 'tr' ? 'Nadir At Parçası Olasılıkları' : 'Rare Horse Fragment Drop Rates')
+                                : (locale == 'tr' ? 'Standart At Parçası Olasılıkları' : 'Standard Horse Fragment Drop Rates'))
+                            : (isRare
+                                ? (locale == 'tr' ? 'Nadir Jokey Parçası Olasılıkları' : 'Rare Jockey Fragment Drop Rates')
+                                : (locale == 'tr' ? 'Standart Jokey Parçası Olasılıkları' : 'Standard Jockey Fragment Drop Rates')),
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.charcoalBrown,
                         ),
-                        const SizedBox(width: 4),
-                        const SizedBox(width: 4),
-                        _buildStarRow(targetStars, size: 8),
-                      ],
+                      ),
                     ),
-                    Text(
-                      '${rate.toStringAsFixed(1)}%',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.mintGreen, fontSize: 11),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAF6EE),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFF1EADF)),
+                        ),
+                        child: const Icon(Icons.close_rounded, size: 18, color: AppTheme.mutedBrown),
+                      ),
                     ),
                   ],
                 ),
-              );
-            }),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                locale == 'tr' ? 'Kapat' : 'Close',
-                style: const TextStyle(color: AppTheme.charcoalBrown, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(displayedTiers.length, (i) {
+                        final index = displayedTiers[i];
+                        final rate = displayRates[index];
+                        final double targetStars = index == 5 ? 6.0 : (index + 1).toDouble();
+                        
+                        final String name = isHorse
+                            ? gameState.horses[index].name
+                            : gameState.jockeys[index].name;
+                        final String emoji = isHorse ? getHorseEmoji(index) : getJockeyEmoji(index);
+                        
+                        final bool isUnlocked = isHorse
+                            ? (gameState.horses[index].currentStars > 0.0)
+                            : (gameState.jockeys[index].currentStars > 0.0);
 
-  void _showRareProbabilityInfoDialog() {
-    final notifier = ref.read(gameProvider.notifier);
-    final rates = notifier.getRareChestDropRates();
-    final gameState = ref.read(gameProvider);
-    final locale = ref.read(localeProvider);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.creamBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFFF1EADF), width: 1.5),
-          ),
-          title: Text(
-            locale == 'tr' ? 'Nadir At Parçası Olasılıkları' : 'Rare Horse Fragment Drop Rates',
-            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.charcoalBrown),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(gameState.horses.length, (index) {
-              final horse = gameState.horses[index];
-              final rate = rates[index];
-              final double targetStars = index == 7 ? 5.0 : 1.0 + index * 0.5;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Text(index == 0 ? '🐴' : index % 2 == 0 ? '🏇' : '🐎', style: const TextStyle(fontSize: 14)),
-                        const SizedBox(width: 4),
-                        Text(
-                          horse.name,
-                          style: const TextStyle(fontSize: 11, fontFamily: 'Outfit', color: AppTheme.charcoalBrown),
-                        ),
-                        const SizedBox(width: 4),
-                        const SizedBox(width: 4),
-                        _buildStarRow(targetStars, size: 8),
-                      ],
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 5.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isUnlocked
+                                  ? AppTheme.mintGreen.withValues(alpha: 0.15)
+                                  : const Color(0xFFF1EADF),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Text(emoji, style: const TextStyle(fontSize: 18)),
+                              const SizedBox(width: 8),
+                              _buildStarRow(targetStars, size: 10),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isUnlocked
+                                        ? AppTheme.charcoalBrown
+                                        : AppTheme.charcoalBrown.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isUnlocked
+                                      ? const Color(0xFFF3F4F6)
+                                      : AppTheme.mintGreen.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  isUnlocked
+                                      ? (locale == 'tr' ? '0% (Açıldı)' : '0% (Unlocked)')
+                                      : '${rate.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10,
+                                    color: isUnlocked ? AppTheme.mutedBrown : AppTheme.mintGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                     ),
-                    Text(
-                      '${rate.toStringAsFixed(1)}%',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.mintGreen, fontSize: 11),
-                    ),
-                  ],
+                  ),
                 ),
-              );
-            }),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                locale == 'tr' ? 'Kapat' : 'Close',
-                style: const TextStyle(color: AppTheme.charcoalBrown, fontWeight: FontWeight.bold),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -2281,22 +2555,23 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: Container(
-                        width: 30,
-                        height: 30,
+                        width: gameState.sponsorIsMega ? 34 : 30,
+                        height: gameState.sponsorIsMega ? 34 : 30,
                         decoration: BoxDecoration(
-                          color: AppTheme.softAmber,
+                          color: gameState.sponsorIsMega ? const Color(0xFFFFD700) : AppTheme.softAmber,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: gameState.sponsorIsMega ? Colors.amber.shade100 : Colors.white, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.softAmber.withValues(alpha: 0.6),
-                              blurRadius: 8,
+                              color: gameState.sponsorIsMega ? Colors.amber.withValues(alpha: 0.9) : AppTheme.softAmber.withValues(alpha: 0.6),
+                              blurRadius: gameState.sponsorIsMega ? 14 : 8,
+                              spreadRadius: gameState.sponsorIsMega ? 2 : 0,
                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const Text('🎁', style: TextStyle(fontSize: 13)),
+                        child: Text(gameState.sponsorIsMega ? '👑' : '🎁', style: TextStyle(fontSize: gameState.sponsorIsMega ? 16 : 13)),
                       ),
                     ),
                   ),
@@ -2833,17 +3108,30 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             children: [
                               Text(CategoryConfig.categories[gameState.leagueTier].asset1Emoji, style: const TextStyle(fontSize: 32)),
                               const SizedBox(height: 6),
-                              Text(
-                                gameState.horses[gameState.leagueTier].name,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.charcoalBrown,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      gameState.horses[gameState.leagueTier].name,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.charcoalBrown,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _showNameEditDialog(true, gameState.leagueTier),
+                                    child: const Icon(Icons.edit_rounded, size: 12, color: AppTheme.mutedBrown),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               _buildStarRow(gameState.horses[gameState.leagueTier].currentStars, size: 12),
@@ -2869,17 +3157,30 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             children: [
                               Text(CategoryConfig.categories[gameState.leagueTier].asset2Emoji, style: const TextStyle(fontSize: 32)),
                               const SizedBox(height: 6),
-                              Text(
-                                gameState.jockeys[gameState.leagueTier].name,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.charcoalBrown,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      gameState.jockeys[gameState.leagueTier].name,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.charcoalBrown,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _showNameEditDialog(false, gameState.leagueTier),
+                                    child: const Icon(Icons.edit_rounded, size: 12, color: AppTheme.mutedBrown),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               _buildStarRow(gameState.jockeys[gameState.leagueTier].currentStars, size: 12),
@@ -3244,7 +3545,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                _showStandardProbabilityInfoDialog();
+                                _showProbabilityInfoDialog(isHorse: true, isRare: false);
                               },
                               child: const Padding(
                                 padding: EdgeInsets.only(left: 2.0),
@@ -3386,7 +3687,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                _showRareProbabilityInfoDialog();
+                                _showProbabilityInfoDialog(isHorse: true, isRare: true);
                               },
                               child: const Padding(
                                 padding: EdgeInsets.only(left: 2.0),
@@ -3495,10 +3796,38 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
             ),
           ),
 
-          // Compact Asset Grid
+          // ─── 1. Header Pill Banner: AT GALERİSİ ───
           Container(
-            height: 105,
-            margin: const EdgeInsets.symmetric(vertical: 6),
+            margin: const EdgeInsets.only(top: 8, bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3E2C1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFD68F1A), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              locale == 'tr' ? 'AT GALERİSİ' : 'HORSE GALLERY',
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFFD700),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+
+          // ─── 2. Horse Asset Cards Carousel Grid ───
+          Container(
+            height: 120,
+            margin: const EdgeInsets.symmetric(vertical: 4),
             child: ListView.builder(
               controller: _horseScrollController,
               scrollDirection: Axis.horizontal,
@@ -3519,295 +3848,375 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                   return horseEmojis[idx % horseEmojis.length];
                 }
 
-                Widget cardContent = Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      getHorseEmoji(index),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 2),
-                    _buildStarRow(targetStars, size: 8),
-                    const SizedBox(height: 4),
-                    if (isUnlocked) ...[
-                      Text(
-                        horse.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 10,
-                          fontWeight: isSelected || isAssigned ? FontWeight.bold : FontWeight.normal,
-                          color: index == 5 ? Colors.white : AppTheme.charcoalBrown,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      if (isAssigned)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'AKTİF',
-                            style: TextStyle(
-                              color: AppTheme.mintGreen,
-                              fontSize: 7.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: () {
-                            notifier.assignHorse(horse.id, gameState.leagueTier);
-                            setState(() {
-                              _selectedHorseIndex = mainIndex;
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.mintGreen,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: const Text(
-                            'SEÇ',
-                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: index == 5 ? const Color(0xFF2D2D35) : Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: index == 5 ? const Color(0xFFFFD700).withValues(alpha: 0.5) : Colors.amber.shade200, width: 0.5),
-                        ),
-                        child: Text(
-                          index == 5 ? '💎 1500' : '🧩 ${horse.duplicateCardCount}/20',
-                          style: TextStyle(
-                            fontFamily: 'Outfit',
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: index == 5 ? const Color(0xFFFFD700) : Colors.amber.shade900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-
-                Widget cardWidget = Container(
-                  width: 105,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: index == 5
-                        ? (isSelected || isAssigned ? const Color(0xFF1E1E22) : const Color(0xFF141416))
-                        : (isUnlocked
-                            ? (isAssigned
-                                ? const Color(0xFFE8F5E9)
-                                : (isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7)))
-                            : (isSelected ? Colors.white : Colors.grey.shade50.withValues(alpha: 0.8))),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: index == 5
-                          ? const Color(0xFFFFD700)
-                          : (isAssigned
-                              ? AppTheme.mintGreen
-                              : (isSelected ? AppTheme.mintGreen.withValues(alpha: 0.5) : Colors.grey.shade300)),
-                      width: isSelected || isAssigned || index == 5 ? 2.0 : 1.0,
-                    ),
-                    boxShadow: isSelected || isAssigned
-                        ? [
-                            BoxShadow(
-                              color: (isAssigned ? AppTheme.mintGreen : Colors.black12).withValues(alpha: 0.15),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: cardContent,
-                );
-
-                if (!isUnlocked) {
-                  cardWidget = Stack(
-                    children: [
-                      cardWidget,
-                      const Positioned(
-                        top: 4,
-                        left: 4,
-                        child: Text(
-                          '🔒',
-                          style: TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
                 return GestureDetector(
                   onTap: () {
                     setState(() {
                       _selectedHorseIndex = mainIndex;
                     });
                   },
-                  child: cardWidget,
+                  child: Container(
+                    width: 110,
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isUnlocked
+                          ? (isAssigned || isSelected ? const Color(0xFFFAF8F5) : Colors.white)
+                          : const Color(0xFFF0EAE1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isAssigned
+                            ? AppTheme.mintGreen
+                            : (isSelected
+                                ? const Color(0xFFD68F1A)
+                                : (isUnlocked ? const Color(0xFFEFE8DE) : const Color(0xFFD1C7B7))),
+                        width: isSelected || isAssigned ? 2.0 : 1.0,
+                      ),
+                      boxShadow: isSelected || isAssigned
+                          ? [
+                              BoxShadow(
+                                color: (isAssigned ? AppTheme.mintGreen : const Color(0xFFD68F1A)).withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Horse Portrait Box
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isUnlocked ? AppTheme.creamBackground : const Color(0xFFE5DDD0),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFEFE8DE), width: 1),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                getHorseEmoji(index),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  color: isUnlocked ? null : Colors.grey,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              horse.name.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: isUnlocked ? AppTheme.charcoalBrown : AppTheme.mutedBrown,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            _buildStarRow(targetStars, size: 8),
+                            const SizedBox(height: 4),
+                            if (isUnlocked)
+                              if (isAssigned)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.mintGreen,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    locale == 'tr' ? 'SEÇİLİ' : 'ACTIVE',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () {
+                                    notifier.assignHorse(horse.id, gameState.leagueTier);
+                                    setState(() {
+                                      _selectedHorseIndex = mainIndex;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.mintGreen.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: AppTheme.mintGreen, width: 1),
+                                    ),
+                                    child: Text(
+                                      locale == 'tr' ? 'SEÇ' : 'SELECT',
+                                      style: const TextStyle(
+                                        color: AppTheme.mintGreen,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  locale == 'tr' ? '🧩 ${horse.duplicateCardCount}/20 parça' : '🧩 ${horse.duplicateCardCount}/20 cards',
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        // Locked Chains & Padlock Overlay (Matching reference image)
+                        if (!isUnlocked)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('⛓️', style: TextStyle(fontSize: 16)),
+                                  Icon(Icons.lock_outline_rounded, color: Colors.white, size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
           ),
 
-          // Selected Horse details & upgrade section
-          isSelectedHorseUnlocked
-              ? Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // ─── 3. Header Pill Banner: [HORSE NAME] AHIRLARI ───
+          if (isSelectedHorseUnlocked) ...[
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3E2C1E),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD68F1A), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '${selectedHorse.name.toUpperCase()} ${locale == 'tr' ? 'AHIRLARI' : 'STABLES'}',
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFFD700),
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ),
+
+            // Power Header Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${selectedHorse.name} ${locale == 'tr' ? 'Ahırları' : 'Stables'}',
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.charcoalBrown,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildStarRow(selectedHorse.currentStars, size: 12),
+                    ],
+                  ),
+                  Text(
+                    '${locale == 'tr' ? 'Toplam Güç' : 'Total Power'}: $horseTotalPower',
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.mintGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // ─── 4. Stat Upgrade 2x2 Grid Layout (Matching reference image!) ───
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: stats.map((stat) {
+                  final String id = stat['id'] as String;
+                  final int level = selectedHorse.stats[id] ?? 0;
+                  final double cost = notifier.getHorseStatUpgradeCost(selectedHorse.associatedLeagueTier, level, id);
+                  final bool canAfford = gameState.gold >= cost;
+
+                  final int currentVal = getStatValue(id, level);
+                  final int nextVal = getStatValue(id, level + 1);
+
+                  return SizedBox(
+                    width: (MediaQuery.of(context).size.width - 32) / 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: canAfford ? AppTheme.mintGreen.withValues(alpha: 0.35) : const Color(0xFFF1EADF),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Top Header Inside Stat Card: Emoji Box + Stat Name & Level
                           Row(
                             children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.creamBackground,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFEFE8DE), width: 1),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(stat['emoji'] as String, style: const TextStyle(fontSize: 18)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (stat['name'] as String).toUpperCase(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.charcoalBrown,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${locale == 'tr' ? 'Lvl' : 'Lvl'} $level',
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 9,
+                                        color: AppTheme.mutedBrown,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Stat Value Transition Preview (10 -> 13)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                               Text(
-                                selectedHorse.name,
+                                '$currentVal',
                                 style: const TextStyle(
                                   fontFamily: 'Outfit',
-                                  fontSize: 15,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.charcoalBrown,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              _buildStarRow(selectedHorse.currentStars, size: 14),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.arrow_forward_rounded, size: 12, color: AppTheme.mintGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$nextVal',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.mintGreen,
+                                ),
+                              ),
                             ],
                           ),
-                          // Display Selected Horse's Current Total Power Rating cleanly next to upgrade options, and completely remove fragment text.
-                          Text(
-                            locale == 'tr'
-                                ? 'Toplam Güç: $horseTotalPower'
-                                : 'Total Power: $horseTotalPower',
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.mintGreen,
+                          const SizedBox(height: 8),
+
+                          // Full Width Train Button (Matching reference image: Eğit: 🪙100)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 30,
+                            child: ElevatedButton(
+                              onPressed: () => _upgradeHorseStat(_selectedHorseIndex, id),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
+                                foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown,
+                                elevation: canAfford ? 1 : 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text(
+                                '${locale == 'tr' ? 'Eğit' : 'Train'}: 🪙${_formatNumber(cost)}',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Low-profile Upgrade List (without Expanded or inner scroll view to unify vertical feed)
-                    Column(
-                      children: stats.map((stat) {
-                        final String id = stat['id'] as String;
-                        final int level = selectedHorse.stats[id] ?? 0;
-                        final double cost = notifier.getHorseStatUpgradeCost(selectedHorse.associatedLeagueTier, level, id);
-                        final bool canAfford = gameState.gold >= cost;
-
-                        final int currentVal = getStatValue(id, level);
-                        final int nextVal = getStatValue(id, level + 1);
-
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 12),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFF1EADF), width: 1.0),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(stat['emoji'] as String, style: const TextStyle(fontSize: 16)),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          stat['name'] as String,
-                                          style: const TextStyle(
-                                            fontFamily: 'Outfit',
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.charcoalBrown,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          locale == 'tr' ? 'Sev $level' : 'Lvl $level',
-                                          style: const TextStyle(fontFamily: 'Outfit', fontSize: 9.5, color: AppTheme.mutedBrown),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(
-                                          fontFamily: 'Outfit',
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.charcoalBrown,
-                                        ),
-                                        children: [
-                                          TextSpan(text: '$currentVal'),
-                                          TextSpan(
-                                            text: ' -> $nextVal',
-                                            style: const TextStyle(color: AppTheme.mintGreen),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => _upgradeHorseStat(_selectedHorseIndex, id),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
-                                  foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      AppStrings.get(locale, 'train_btn'),
-                                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '🪙${_formatNumber(cost)}',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: canAfford ? Colors.white : AppTheme.salmonPink,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                )
-              : Container(
-                  padding: const EdgeInsets.all(20),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(20),
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -3955,15 +4364,16 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             elevation: 2,
                           ),
-                          child: const Text(
-                            'Parça Satın Al',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          child: Text(
+                            locale == 'tr' ? 'Parça Satın Al' : 'Buy Fragments',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
                     ],
                   ),
                 ),
+              ],
         ],
       ),
     );
@@ -4019,7 +4429,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => _showStandardProbabilityInfoDialog(),
+                              onTap: () => _showProbabilityInfoDialog(isHorse: false, isRare: false),
                               child: const Padding(padding: EdgeInsets.only(left: 2.0), child: Text('ℹ️', style: TextStyle(fontSize: 11))),
                             ),
                           ],
@@ -4036,7 +4446,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                                     height: 32, width: double.infinity,
                                     child: ElevatedButton(
                                       onPressed: gameState.tickets >= 1 ? () {
-                                        final r = notifier.openStandardChest1xTicket();
+                                        final r = notifier.openStandardJockeyChest1xTicket();
                                         if (r != null) _showLootboxResultDialog(r);
                                       } : null,
                                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A8A), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.3), padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
@@ -4056,7 +4466,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                                     height: 32, width: double.infinity,
                                     child: ElevatedButton(
                                       onPressed: gameState.diamonds >= 100 ? () {
-                                        final r = notifier.openStandardChest10xDiamonds();
+                                        final r = notifier.openStandardJockeyChest10xDiamonds();
                                         if (r != null) _showLootboxResultDialog(r);
                                       } : null,
                                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A8A), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.3), padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
@@ -4096,7 +4506,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => _showRareProbabilityInfoDialog(),
+                              onTap: () => _showProbabilityInfoDialog(isHorse: false, isRare: true),
                               child: const Padding(padding: EdgeInsets.only(left: 2.0), child: Text('ℹ️', style: TextStyle(fontSize: 11))),
                             ),
                           ],
@@ -4113,7 +4523,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                                     height: 32, width: double.infinity,
                                     child: ElevatedButton(
                                       onPressed: gameState.diamonds >= 50 ? () {
-                                        final r = notifier.openNadirChest1xDiamonds();
+                                        final r = notifier.openNadirJockeyChest1xDiamonds();
                                         if (r != null) _showLootboxResultDialog(r);
                                       } : null,
                                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF581C87), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF581C87).withValues(alpha: 0.3), padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
@@ -4133,7 +4543,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                                     height: 32, width: double.infinity,
                                     child: ElevatedButton(
                                       onPressed: gameState.diamonds >= 500 ? () {
-                                        final r = notifier.openNadirChest10xDiamonds();
+                                        final r = notifier.openNadirJockeyChest10xDiamonds();
                                         if (r != null) _showLootboxResultDialog(r);
                                       } : null,
                                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF581C87), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF581C87).withValues(alpha: 0.3), padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
@@ -4152,10 +4562,38 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
               ],
             ),
           ),
-          // ── Jockey Selector ──
+          // ─── 1. Header Pill Banner: JOKEY GALERİSİ ───
           Container(
-            height: 105,
-            margin: const EdgeInsets.symmetric(vertical: 6),
+            margin: const EdgeInsets.only(top: 8, bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3E2C1E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFD68F1A), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              locale == 'tr' ? 'JOKEY GALERİSİ' : 'JOCKEY GALLERY',
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFFD700),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+
+          // ─── 2. Jockey Asset Cards Carousel Grid ───
+          Container(
+            height: 120,
+            margin: const EdgeInsets.symmetric(vertical: 4),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -4174,146 +4612,372 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                   return emojis[idx % emojis.length];
                 }
 
-                Widget cardContent = Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(getJockeyEmoji(index), style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 2),
-                    _buildStarRow(targetStars, size: 8),
-                    const SizedBox(height: 4),
-                    if (isUnlocked) ...[
-                      Text(
-                        jockey.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: 'Outfit', fontSize: 10, fontWeight: isSelected || isAssigned ? FontWeight.bold : FontWeight.normal, color: isVIP ? Colors.white : AppTheme.charcoalBrown),
-                      ),
-                      const SizedBox(height: 2),
-                      if (isAssigned)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-                          child: const Text('AKTİF', style: TextStyle(color: AppTheme.mintGreen, fontSize: 7.5, fontWeight: FontWeight.bold)),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: () { notifier.assignJockey(jockey.id, gameState.leagueTier); setState(() { _selectedJockeyIndex = mainIndex; }); },
-                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.mintGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                          child: Text(locale == 'tr' ? 'SEÇ' : 'SELECT', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
-                        ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(color: isVIP ? const Color(0xFF2D2D35) : Colors.amber.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: isVIP ? const Color(0xFFFFD700).withValues(alpha: 0.5) : Colors.amber.shade200, width: 0.5)),
-                        child: Text(isVIP ? '💎 1500' : '🧩 ${jockey.duplicateCardCount}/5', style: TextStyle(fontFamily: 'Outfit', fontSize: 8.5, fontWeight: FontWeight.bold, color: isVIP ? const Color(0xFFFFD700) : Colors.amber.shade900)),
-                      ),
-                    ],
-                  ],
-                );
-
-                Widget cardWidget = Container(
-                  width: 105,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isVIP ? (isSelected || isAssigned ? const Color(0xFF1E1E22) : const Color(0xFF141416)) : (isUnlocked ? (isAssigned ? const Color(0xFFE8F5E9) : (isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7))) : (isSelected ? Colors.white : Colors.grey.shade50.withValues(alpha: 0.8))),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isVIP ? const Color(0xFFFFD700) : (isAssigned ? AppTheme.mintGreen : (isSelected ? AppTheme.mintGreen.withValues(alpha: 0.5) : Colors.grey.shade300)), width: isSelected || isAssigned || isVIP ? 2.0 : 1.0),
-                    boxShadow: isSelected || isAssigned ? [BoxShadow(color: (isAssigned ? AppTheme.mintGreen : Colors.black12).withValues(alpha: 0.15), blurRadius: 4, offset: const Offset(0, 2))] : null,
-                  ),
-                  child: cardContent,
-                );
-
-                if (!isUnlocked) {
-                  cardWidget = Stack(children: [
-                    cardWidget,
-                    const Positioned(top: 4, left: 4, child: Text('🔒', style: TextStyle(fontSize: 10))),
-                  ]);
-                }
-
                 return GestureDetector(
-                  onTap: () { setState(() { _selectedJockeyIndex = mainIndex; }); },
-                  child: cardWidget,
-                );
-              },
-            ),
-          ),
-          // ── Selected Jockey Detail ──
-          if (isSelectedJockeyUnlocked) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(selectedJockey.name, style: const TextStyle(fontFamily: 'Outfit', fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown)),
-                      const SizedBox(width: 8),
-                      _buildStarRow(selectedJockey.currentStars, size: 14),
-                    ],
-                  ),
-                  Text(
-                    locale == 'tr' ? 'Toplam Güç: ${_getJockeyPower(selectedJockey)}' : 'Total Power: ${_getJockeyPower(selectedJockey)}',
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.mintGreen),
-                  ),
-                ],
-              ),
-            ),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.35),
-              itemCount: skills.length,
-              itemBuilder: (context, index) {
-                final skill = skills[index];
-                final String id = skill['id'] as String;
-                final int level = selectedJockey.skills[id] ?? 1;
-                final double cost = notifier.getJockeySkillUpgradeCost(selectedJockey.associatedLeagueTier, level, id);
-                final bool canAfford = gameState.gold >= cost;
-                final int currentSkillVal = _getSkillValue(id, level);
-                final int nextSkillVal = _getSkillValue(id, level + 1);
-                return Container(
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF1EADF), width: 1.5)),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14.5),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  onTap: () {
+                    setState(() {
+                      _selectedJockeyIndex = mainIndex;
+                    });
+                  },
+                  child: Container(
+                    width: 110,
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isUnlocked
+                          ? (isAssigned || isSelected ? const Color(0xFFFAF8F5) : Colors.white)
+                          : const Color(0xFFF0EAE1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isAssigned
+                            ? AppTheme.mintGreen
+                            : (isSelected
+                                ? const Color(0xFFD68F1A)
+                                : (isUnlocked ? const Color(0xFFEFE8DE) : const Color(0xFFD1C7B7))),
+                        width: isSelected || isAssigned ? 2.0 : 1.0,
+                      ),
+                      boxShadow: isSelected || isAssigned
+                          ? [
+                              BoxShadow(
+                                color: (isAssigned ? AppTheme.mintGreen : const Color(0xFFD68F1A)).withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0, bottom: 4.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(skill['emoji'] as String, style: const TextStyle(fontSize: 22)),
-                                const SizedBox(height: 4),
-                                Text(skill['name'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(locale == 'tr' ? 'Seviye $level' : 'Level $level', style: const TextStyle(fontFamily: 'Outfit', fontSize: 10, color: AppTheme.mutedBrown)),
-                                const SizedBox(height: 2),
-                                RichText(textAlign: TextAlign.center, text: TextSpan(style: const TextStyle(fontFamily: 'Outfit', fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.charcoalBrown), children: [TextSpan(text: '$currentSkillVal'), TextSpan(text: ' -> $nextSkillVal', style: const TextStyle(color: AppTheme.mintGreen))])),
-                              ],
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Jockey Portrait Box
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isUnlocked ? AppTheme.creamBackground : const Color(0xFFE5DDD0),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFEFE8DE), width: 1),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                getJockeyEmoji(index),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  color: isUnlocked ? null : Colors.grey,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              jockey.name.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: isUnlocked ? AppTheme.charcoalBrown : AppTheme.mutedBrown,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            _buildStarRow(targetStars, size: 8),
+                            const SizedBox(height: 4),
+                            if (isUnlocked)
+                              if (isAssigned)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.mintGreen,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    locale == 'tr' ? 'SEÇİLİ' : 'ACTIVE',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () {
+                                    notifier.assignJockey(jockey.id, gameState.leagueTier);
+                                    setState(() {
+                                      _selectedJockeyIndex = mainIndex;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.mintGreen.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: AppTheme.mintGreen, width: 1),
+                                    ),
+                                    child: Text(
+                                      locale == 'tr' ? 'SEÇ' : 'SELECT',
+                                      style: const TextStyle(
+                                        color: AppTheme.mintGreen,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isVIP ? '💎 1500' : (locale == 'tr' ? '🧩 ${jockey.duplicateCardCount}/5 parça' : '🧩 ${jockey.duplicateCardCount}/5 cards'),
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        // Locked Chains & Padlock Overlay
+                        if (!isUnlocked)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('⛓️', style: TextStyle(fontSize: 16)),
+                                  Icon(Icons.lock_outline_rounded, color: Colors.white, size: 20),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => _upgradeJockeySkill(_selectedJockeyIndex, id),
-                          style: ElevatedButton.styleFrom(backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE), foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), elevation: 0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(AppStrings.get(locale, 'train_btn'), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                              Text('🪙${_formatNumber(cost)}', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: canAfford ? Colors.white : AppTheme.salmonPink)),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 );
               },
             ),
+          ),
+
+          // ─── 3. Header Pill Banner: [JOCKEY NAME] ODASI ───
+          if (isSelectedJockeyUnlocked) ...[
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3E2C1E),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD68F1A), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '${selectedJockey.name.toUpperCase()} ${locale == 'tr' ? 'ODASI' : 'ROOM'}',
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFFD700),
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ),
+
+            // Power Header Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${selectedJockey.name} ${locale == 'tr' ? 'Odası' : 'Room'}',
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.charcoalBrown,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildStarRow(selectedJockey.currentStars, size: 12),
+                    ],
+                  ),
+                  Text(
+                    '${locale == 'tr' ? 'Toplam Güç' : 'Total Power'}: ${_getJockeyPower(selectedJockey)}',
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.mintGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // ─── 4. Skill Upgrade 2x2 Grid Layout (Matching Horses tab!) ───
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: skills.map((skill) {
+                  final String id = skill['id'] as String;
+                  final int level = selectedJockey.skills[id] ?? 1;
+                  final double cost = notifier.getJockeySkillUpgradeCost(selectedJockey.associatedLeagueTier, level, id);
+                  final bool canAfford = gameState.gold >= cost;
+
+                  final int currentSkillVal = _getSkillValue(id, level);
+                  final int nextSkillVal = _getSkillValue(id, level + 1);
+
+                  return SizedBox(
+                    width: (MediaQuery.of(context).size.width - 32) / 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: canAfford ? AppTheme.mintGreen.withValues(alpha: 0.35) : const Color(0xFFF1EADF),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top Header Inside Skill Card: Emoji Box + Skill Name & Level
+                          Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.creamBackground,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFEFE8DE), width: 1),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(skill['emoji'] as String, style: const TextStyle(fontSize: 18)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (skill['name'] as String).toUpperCase(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.charcoalBrown,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${locale == 'tr' ? 'Lvl' : 'Lvl'} $level',
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 9,
+                                        color: AppTheme.mutedBrown,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Skill Value Transition Preview (10 -> 13)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$currentSkillVal',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.charcoalBrown,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.arrow_forward_rounded, size: 12, color: AppTheme.mintGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$nextSkillVal',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.mintGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Full Width Train Button (Matching reference image: Eğit: 🪙100)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 30,
+                            child: ElevatedButton(
+                              onPressed: () => _upgradeJockeySkill(_selectedJockeyIndex, id),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
+                                foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown,
+                                elevation: canAfford ? 1 : 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text(
+                                '${locale == 'tr' ? 'Eğit' : 'Train'}: 🪙${_formatNumber(cost)}',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
           ] else ...[
             Container(
               padding: const EdgeInsets.all(20),
@@ -4373,7 +5037,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                     ElevatedButton(
                       onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context) => const MarketScreen())); },
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 2),
-                      child: const Text('Parça Satın Al', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      child: Text(locale == 'tr' ? 'Parça Satın Al' : 'Buy Fragments', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ],
@@ -4422,7 +5086,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
     ];
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       itemCount: buildings.length,
       itemBuilder: (context, index) {
         final b = buildings[index];
@@ -4431,78 +5095,290 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
         final double cost = notifier.getUpgradeCost(id, level);
         final bool canAfford = gameState.gold >= cost;
 
-        double passiveSec = 0.0;
-        if (id == 'training_track') {
-          passiveSec = level * 1.0;
-        } else if (id == 'medical_center') {
-          passiveSec = level * 3.0;
-        } else if (id == 'feed_storage') {
-          passiveSec = level * 6.0;
-        } else if (id == 'research_lab') {
-          passiveSec = level * 12.0;
-        } else if (id == 'luxury_stable') {
-          passiveSec = level * 24.0;
-        }
-        passiveSec *= math.pow(10.0, gameState.leagueTier);
+        final bool hasVip = gameState.equippedEquipment['vip_pass'] == 'active';
+        final double vipMultiplier = hasVip ? 2.0 : 1.0;
+        final double boostMultiplier = gameState.boostTimeLeft > 0 ? 2.0 : 1.0;
+        final double multiplier = math.pow(10.0, gameState.leagueTier) * vipMultiplier * boostMultiplier;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
+        double baseYieldPerLvl = 1.0;
+        if (id == 'training_track') {
+          baseYieldPerLvl = 1.0;
+        } else if (id == 'medical_center') {
+          baseYieldPerLvl = 3.5;
+        } else if (id == 'feed_storage') {
+          baseYieldPerLvl = 15.0;
+        } else if (id == 'research_lab') {
+          baseYieldPerLvl = 70.0;
+        } else if (id == 'luxury_stable') {
+          baseYieldPerLvl = 300.0;
+        }
+
+        double getMilestoneMult(int l) {
+          if (l >= 100) return 25.0;
+          if (l >= 50) return 10.0;
+          if (l >= 25) return 4.0;
+          if (l >= 10) return 2.0;
+          return 1.0;
+        }
+
+        final double currentYield = level * baseYieldPerLvl * getMilestoneMult(level) * multiplier;
+        final double nextYield = (level + 1) * baseYieldPerLvl * getMilestoneMult(level + 1) * multiplier;
+        final double nextAddYield = nextYield - currentYield;
+
+        int nextMilestoneLevel = 10;
+        int nextMilestoneBonus = 2;
+        if (level >= 100) {
+          nextMilestoneLevel = 200;
+          nextMilestoneBonus = 50;
+        } else if (level >= 50) {
+          nextMilestoneLevel = 100;
+          nextMilestoneBonus = 25;
+        } else if (level >= 25) {
+          nextMilestoneLevel = 50;
+          nextMilestoneBonus = 10;
+        } else if (level >= 10) {
+          nextMilestoneLevel = 25;
+          nextMilestoneBonus = 4;
+        }
+
+        int prevMilestoneLevel = 0;
+        if (level >= 100) {
+          prevMilestoneLevel = 100;
+        } else if (level >= 50) {
+          prevMilestoneLevel = 50;
+        } else if (level >= 25) {
+          prevMilestoneLevel = 25;
+        } else if (level >= 10) {
+          prevMilestoneLevel = 10;
+        }
+        final double progress = ((level - prevMilestoneLevel) / (nextMilestoneLevel - prevMilestoneLevel)).clamp(0.0, 1.0);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: canAfford ? AppTheme.mintGreen.withValues(alpha: 0.4) : const Color(0xFFF1EADF),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12.0),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(b['emoji'] as String, style: const TextStyle(fontSize: 30)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // ─── Top Main Row (Icon Avatar + Title & Progress + Upgrade Button) ───
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Circular Avatar with overlapping Level Badge (Matching reference image)
+                    SizedBox(
+                      width: 54,
+                      height: 58,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            top: 0,
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: AppTheme.creamBackground,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFD68F1A), width: 2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFD68F1A).withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(b['emoji'] as String, style: const TextStyle(fontSize: 24)),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF332A24),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                              ),
+                              child: Text(
+                                'LV. $level',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFFFD700),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Middle Column: Title, Progress Bar, Current Yield
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (b['name'] as String).toUpperCase(),
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.charcoalBrown,
+                              letterSpacing: 0.4,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Milestone Level Progress Bar (Matching reference image)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: SizedBox(
+                              height: 8,
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: const Color(0xFFEFE8DE),
+                                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.mintGreen),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Current Yield Label
+                          Row(
+                            children: [
+                              const Text('🪙', style: TextStyle(fontSize: 10)),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${_formatNumber(currentYield)}${AppStrings.get(locale, 'passive_per_sec')}',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFD68F1A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Right Side Column: Upgrade Button + Cost Subtext (Matching reference image)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => _upgradeBuilding(id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
+                            foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown,
+                            elevation: canAfford ? 2 : 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text(
+                            locale == 'tr' ? 'YÜKSELT' : 'UPGRADE',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${locale == 'tr' ? 'Maliyet' : 'Cost'}: 🪙${_formatNumber(cost)}',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: canAfford ? AppTheme.mutedBrown : AppTheme.salmonPink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // ─── Bottom Inset Panel (Bonus & Milestone Goal) ───
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAF8F5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1EADF), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${b['name']} (Lv.$level)',
-                        style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.bold),
+                      // Next Level Upgrade Bonus
+                      Row(
+                        children: [
+                          const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${locale == 'tr' ? 'Bonus' : 'Bonus'}: ',
+                            style: const TextStyle(fontFamily: 'Outfit', fontSize: 10, color: AppTheme.mutedBrown),
+                          ),
+                          Text(
+                            '+🪙${_formatNumber(nextAddYield)}${AppStrings.get(locale, 'passive_per_sec')}',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        b['desc'] as String,
-                        style: const TextStyle(fontFamily: 'Outfit', fontSize: 9.5, color: AppTheme.mutedBrown),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${AppStrings.get(locale, 'yield_label')} 🪙${_formatNumber(passiveSec)}${AppStrings.get(locale, 'passive_per_sec')}',
-                        style: const TextStyle(fontFamily: 'Outfit', fontSize: 10, color: AppTheme.mintGreen, fontWeight: FontWeight.bold),
+
+                      // Milestone Target
+                      Row(
+                        children: [
+                          const Text('🎯', style: TextStyle(fontSize: 10)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${locale == 'tr' ? 'Hedef' : 'Target'}: Lv.$nextMilestoneLevel (x$nextMilestoneBonus)',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFB87A14),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 6),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '🪙${_formatNumber(cost)}',
-                      style: TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: canAfford ? AppTheme.mintGreen : AppTheme.salmonPink,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ElevatedButton(
-                      onPressed: () => _upgradeBuilding(id),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: canAfford ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
-                        foregroundColor: canAfford ? Colors.white : AppTheme.mutedBrown,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        AppStrings.get(locale, 'upgrade_btn'),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -5001,15 +5877,6 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(AppStrings.get(locale, 'insta_win_success')), backgroundColor: AppTheme.mintGreen),
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(locale == 'tr'
-                              ? 'Yeterli elmas yok! (2 elmas gerekli)'
-                              : 'Not enough diamonds! (2 diamonds required)'),
-                          backgroundColor: AppTheme.salmonPink,
-                        ),
-                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -5047,12 +5914,7 @@ class _MainGameScreenState extends ConsumerState<MainGameScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    final success = notifier.tradeGoldForDiamonds();
-                    if (!success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(AppStrings.get(locale, 'not_enough_gold')), backgroundColor: AppTheme.salmonPink),
-                      );
-                    }
+                    notifier.tradeGoldForDiamonds();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: canAffordTrade ? AppTheme.mintGreen : const Color(0xFFEFE8DE),
@@ -6357,7 +7219,29 @@ class _LootboxRevealDialogState extends ConsumerState<_LootboxRevealDialog> with
                     child: Row(
                       children: [
                         Text(
-                          CategoryConfig.categories[gameState.leagueTier.clamp(0, 5)].asset1Emoji,
+                          drop['type'] == 'jockey'
+                              ? (tier == 0
+                                  ? '🤠'
+                                  : tier == 1
+                                      ? '👩‍🌾'
+                                      : tier == 2
+                                          ? '🏎️'
+                                          : tier == 3
+                                              ? '🧑‍🚀'
+                                              : tier == 4
+                                                  ? '🦸'
+                                                  : '👑')
+                              : (tier == 0
+                                  ? '🐴'
+                                  : tier == 1
+                                      ? '🐎'
+                                      : tier == 2
+                                          ? '🏇'
+                                          : tier == 3
+                                              ? '⚡'
+                                              : tier == 4
+                                                  ? '🌟'
+                                                  : '🦄'),
                           style: const TextStyle(fontSize: 28),
                         ),
                         const SizedBox(width: 10),
@@ -6456,7 +7340,8 @@ class _LootboxRevealDialogState extends ConsumerState<_LootboxRevealDialog> with
     List<Widget> starWidgets = [];
     int fullStars = stars.floor();
     bool hasHalf = (stars - fullStars) >= 0.5;
-    for (int i = 0; i < 5; i++) {
+    int count = stars > 5.0 ? stars.toInt() : 5;
+    for (int i = 0; i < count; i++) {
       if (i < fullStars) {
         starWidgets.add(Icon(Icons.star, color: Colors.amber, size: size));
       } else if (i == fullStars && hasHalf) {

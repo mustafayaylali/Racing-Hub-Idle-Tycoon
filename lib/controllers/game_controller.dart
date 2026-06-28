@@ -172,7 +172,7 @@ class GameNotifier extends Notifier<GameStateModel> {
         base = 150000.0;
         break;
     }
-    return base * _getLeagueModifier(state.leagueTier) * math.pow(1.15, currentLevel);
+    return base * _getLeagueModifier(state.leagueTier) * math.pow(1.22, currentLevel);
   }
 
   double getHorseStatUpgradeCost(int tier, int level, String statId) {
@@ -321,6 +321,15 @@ class GameNotifier extends Notifier<GameStateModel> {
         }
         loadedState = loadedState.copyWith(
           goldPerSecond: _calculateGoldPerSecond(loadedState.buildings),
+          winChance: _calculateWinChance(
+            loadedState.horses,
+            loadedState.jockeys,
+            loadedState.leagueTier,
+            loadedState.inventory,
+            loadedState.equippedEquipment,
+            loadedState.buildings,
+            classIdx: loadedState.currentClassIndex,
+          ),
         );
         return _applyOfflineProgress(loadedState, now);
       } catch (e) {
@@ -393,6 +402,8 @@ class GameNotifier extends Notifier<GameStateModel> {
       currentClassIndex: savedClass,
       sponsorActive: false,
       sponsorPosition: 1.0,
+      sponsorIsMega: false,
+      sponsorCooldown: 0,
       raceState: 'racing',
       resultsCountdown: 0,
       lastRacePlacement: 1,
@@ -496,17 +507,26 @@ class GameNotifier extends Notifier<GameStateModel> {
     // 3. Sponsor Movement & Spawning
     bool currentSponsorActive = state.sponsorActive;
     double currentSponsorPos = state.sponsorPosition;
+    bool currentSponsorMega = state.sponsorIsMega;
+    int currentSponsorCooldown = state.sponsorCooldown;
+
+    if (currentSponsorCooldown > 0 && _tickCount % 10 == 0) {
+      currentSponsorCooldown = math.max(0, currentSponsorCooldown - 1);
+    }
 
     if (!currentSponsorActive) {
-      if (random.nextDouble() < 0.003) {
+      if (currentSponsorCooldown == 0 && random.nextDouble() < 0.0008) {
         currentSponsorActive = true;
         currentSponsorPos = 1.0;
+        currentSponsorMega = random.nextDouble() < 0.15;
       }
     } else {
-      currentSponsorPos -= 0.006;
+      currentSponsorPos -= 0.012;
       if (currentSponsorPos < -0.2) {
         currentSponsorActive = false;
         currentSponsorPos = 1.0;
+        currentSponsorMega = false;
+        currentSponsorCooldown = 60;
       }
     }
 
@@ -768,6 +788,8 @@ class GameNotifier extends Notifier<GameStateModel> {
       boostTimeLeft: currentBoostTime,
       sponsorActive: currentSponsorActive,
       sponsorPosition: currentSponsorPos,
+      sponsorIsMega: currentSponsorMega,
+      sponsorCooldown: currentSponsorCooldown,
       raceState: currentRaceState,
       raceTimeLeft: currentRaceTimeLeft,
       raceDurationSeconds: nextDurationSeconds,
@@ -829,27 +851,48 @@ class GameNotifier extends Notifier<GameStateModel> {
     final double boostMultiplier = state.boostTimeLeft > 0 ? 2.0 : 1.0;
     final double passiveGoldSec = state.goldPerSecond * math.pow(10.0, state.leagueTier) * vipMultiplier * boostMultiplier;
     
-    if (passiveGoldSec < 30.0) {
-      final rand = math.Random();
-      return 5000.0 + rand.nextInt(1001); // 5-6k coin
+    final rand = math.Random();
+    if (state.sponsorIsMega) {
+      if (passiveGoldSec < 10.0) {
+        return 3000.0 + rand.nextInt(500);
+      }
+      return passiveGoldSec * 600.0;
     } else {
-      return passiveGoldSec * 300.0; // saniyelik gelirin 300s çarpılmışı
+      final int secs = 180 + rand.nextInt(121);
+      if (passiveGoldSec < 10.0) {
+        return 1000.0 + rand.nextInt(500);
+      }
+      return passiveGoldSec * secs;
     }
   }
 
   void claimSponsorReward() {
-    double rewardGold = getSponsorRewardGold();
-    state = state.copyWith(
-      gold: state.gold + rewardGold,
-      sponsorActive: false,
-      sponsorPosition: 1.0,
-    );
+    if (state.sponsorIsMega && math.Random().nextBool()) {
+      state = state.copyWith(
+        diamonds: state.diamonds + 5,
+        sponsorActive: false,
+        sponsorPosition: 1.0,
+        sponsorIsMega: false,
+        sponsorCooldown: 90,
+      );
+    } else {
+      double rewardGold = getSponsorRewardGold();
+      state = state.copyWith(
+        gold: state.gold + rewardGold,
+        sponsorActive: false,
+        sponsorPosition: 1.0,
+        sponsorIsMega: false,
+        sponsorCooldown: 90,
+      );
+    }
   }
 
   void rejectSponsorReward() {
     state = state.copyWith(
       sponsorActive: false,
       sponsorPosition: 1.0,
+      sponsorIsMega: false,
+      sponsorCooldown: 90,
     );
   }
 
@@ -1343,22 +1386,26 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   List<double> getStandardChestDropRates() {
     List<double> weights = List.filled(6, 0.0);
-    List<int> lockedTiers = [];
+    double maxStars = 1.0;
     for (int i = 0; i <= 4; i++) {
-      if (state.horses[i].currentStars == 0.0) {
-        lockedTiers.add(i);
+      if (state.horses[i].currentStars > 0.0) {
+        double stars = (i + 1).toDouble();
+        if (stars > maxStars) {
+          maxStars = stars;
+        }
       }
     }
+    int highestStars = maxStars.toInt();
     
-    if (lockedTiers.isNotEmpty) {
-      double rate = 100.0 / lockedTiers.length;
-      for (int t in lockedTiers) {
-        weights[t] = rate;
-      }
+    if (highestStars == 1) {
+      weights[1] = 80.0; // Tier 1 (2*)
+      weights[2] = 20.0; // Tier 2 (3*)
+    } else if (highestStars == 2) {
+      weights[2] = 80.0; // Tier 2 (3*)
+      weights[3] = 20.0; // Tier 3 (4*)
     } else {
-      for (int i = 0; i <= 4; i++) {
-        weights[i] = 20.0;
-      }
+      weights[3] = 95.0; // Tier 3 (4*)
+      weights[4] = 5.0;  // Tier 4 (5*)
     }
     return weights;
   }
@@ -1419,21 +1466,33 @@ class GameNotifier extends Notifier<GameStateModel> {
 
   List<double> getRareChestDropRates() {
     List<double> weights = List.filled(6, 0.0);
-    List<int> lockedTiers = [];
+    double maxStars = 1.0;
     for (int i = 0; i <= 4; i++) {
-      if (state.horses[i].currentStars == 0.0) {
-        lockedTiers.add(i);
+      if (state.horses[i].currentStars > 0.0) {
+        double stars = (i + 1).toDouble();
+        if (stars > maxStars) {
+          maxStars = stars;
+        }
       }
     }
-    if (lockedTiers.isNotEmpty) {
-      double rate = 100.0 / lockedTiers.length;
-      for (int t in lockedTiers) {
-        weights[t] = rate;
-      }
+    int highestStars = maxStars.toInt();
+    if (highestStars > 4) highestStars = 4;
+    
+    if (highestStars == 1) {
+      weights[1] = 10.0; // Tier 1 (2*)
+      weights[2] = 20.0; // Tier 2 (3*)
+      weights[3] = 30.0; // Tier 3 (4*)
+      weights[4] = 40.0; // Tier 4 (5*)
+    } else if (highestStars == 2) {
+      weights[2] = 20.0; // Tier 2 (3*)
+      weights[3] = 35.0; // Tier 3 (4*)
+      weights[4] = 45.0; // Tier 4 (5*)
+    } else if (highestStars == 3) {
+      weights[3] = 95.0; // Tier 3 (4*)
+      weights[4] = 5.0;  // Tier 4 (5*)
     } else {
-      for (int i = 0; i <= 4; i++) {
-        weights[i] = 20.0;
-      }
+      weights[4] = 100.0; // Tier 4 (5*)
+      weights[5] = 0.0;   // VIP (6*) -> Never drops
     }
     return weights;
   }
@@ -1487,6 +1546,200 @@ class GameNotifier extends Notifier<GameStateModel> {
           'tier': tier,
           'amount': amount,
           'name': state.horses[tier].name,
+        });
+      });
+      return drops;
+    }
+    return null;
+  }
+
+  void addJockeyFragments(int tier, int amount) {
+    if (tier < 0 || tier >= state.jockeys.length) return;
+    final oldJockey = state.jockeys[tier];
+    int newFragments = oldJockey.duplicateCardCount + amount;
+    double newStars = oldJockey.currentStars;
+    
+    if (newStars == 0.0 && newFragments >= 20) {
+      newStars = tier == 5 ? 6.0 : (tier + 1).toDouble();
+    }
+    
+    final newJockey = oldJockey.copyWith(
+      duplicateCardCount: newFragments,
+      currentStars: newStars,
+    );
+    
+    final newJockeys = List<JockeyAsset>.from(state.jockeys);
+    newJockeys[tier] = newJockey;
+    
+    state = state.copyWith(
+      jockeys: newJockeys,
+      lastSaved: _currentTrustedTime,
+    );
+    _updateWinChance();
+  }
+
+  List<double> getStandardJockeyChestDropRates() {
+    List<double> weights = List.filled(6, 0.0);
+    double maxStars = 1.0;
+    for (int i = 0; i <= 4; i++) {
+      if (state.jockeys[i].currentStars > 0.0) {
+        double stars = (i + 1).toDouble();
+        if (stars > maxStars) {
+          maxStars = stars;
+        }
+      }
+    }
+    int highestStars = maxStars.toInt();
+    
+    if (highestStars == 1) {
+      weights[1] = 80.0; // Tier 1 (2*)
+      weights[2] = 20.0; // Tier 2 (3*)
+    } else if (highestStars == 2) {
+      weights[2] = 80.0; // Tier 2 (3*)
+      weights[3] = 20.0; // Tier 3 (4*)
+    } else {
+      weights[3] = 95.0; // Tier 3 (4*)
+      weights[4] = 5.0;  // Tier 4 (5*)
+    }
+    return weights;
+  }
+
+  int rollStandardJockeyChestDrop(math.Random rand) {
+    final rates = getStandardJockeyChestDropRates();
+    double roll = rand.nextDouble() * 100.0;
+    double cumulative = 0.0;
+    for (int i = 0; i < rates.length; i++) {
+      cumulative += rates[i];
+      if (roll <= cumulative) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  Map<String, dynamic>? openStandardJockeyChest1xTicket() {
+    if (state.tickets >= 1) {
+      state = state.copyWith(tickets: state.tickets - 1);
+      final rand = math.Random();
+      final tier = rollStandardJockeyChestDrop(rand);
+      addJockeyFragments(tier, 1);
+      return {
+        'type': 'jockey',
+        'tier': tier,
+        'amount': 1,
+        'name': state.jockeys[tier].name,
+      };
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>>? openStandardJockeyChest10xDiamonds() {
+    const cost = 100;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final List<Map<String, dynamic>> drops = [];
+      final Map<int, int> tierDrops = {};
+      for (int i = 0; i < 10; i++) {
+        final tier = rollStandardJockeyChestDrop(rand);
+        tierDrops[tier] = (tierDrops[tier] ?? 0) + 1;
+      }
+      tierDrops.forEach((tier, amount) {
+        addJockeyFragments(tier, amount);
+        drops.add({
+          'type': 'jockey',
+          'tier': tier,
+          'amount': amount,
+          'name': state.jockeys[tier].name,
+        });
+      });
+      return drops;
+    }
+    return null;
+  }
+
+  List<double> getRareJockeyChestDropRates() {
+    List<double> weights = List.filled(6, 0.0);
+    double maxStars = 1.0;
+    for (int i = 0; i <= 4; i++) {
+      if (state.jockeys[i].currentStars > 0.0) {
+        double stars = (i + 1).toDouble();
+        if (stars > maxStars) {
+          maxStars = stars;
+        }
+      }
+    }
+    int highestStars = maxStars.toInt();
+    if (highestStars > 4) highestStars = 4;
+    
+    if (highestStars == 1) {
+      weights[1] = 10.0; // Tier 1 (2*)
+      weights[2] = 20.0; // Tier 2 (3*)
+      weights[3] = 30.0; // Tier 3 (4*)
+      weights[4] = 40.0; // Tier 4 (5*)
+    } else if (highestStars == 2) {
+      weights[2] = 20.0; // Tier 2 (3*)
+      weights[3] = 35.0; // Tier 3 (4*)
+      weights[4] = 45.0; // Tier 4 (5*)
+    } else if (highestStars == 3) {
+      weights[3] = 95.0; // Tier 3 (4*)
+      weights[4] = 5.0;  // Tier 4 (5*)
+    } else {
+      weights[4] = 100.0; // Tier 4 (5*)
+      weights[5] = 0.0;   // VIP (6*) -> Never drops
+    }
+    return weights;
+  }
+
+  int rollRareJockeyChestDrop(math.Random rand) {
+    final rates = getRareJockeyChestDropRates();
+    double roll = rand.nextDouble() * 100.0;
+    double cumulative = 0.0;
+    for (int i = 0; i < rates.length; i++) {
+      cumulative += rates[i];
+      if (roll <= cumulative) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  Map<String, dynamic>? openNadirJockeyChest1xDiamonds() {
+    const cost = 50;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final tier = rollRareJockeyChestDrop(rand);
+      final amount = 3;
+      addJockeyFragments(tier, amount);
+      return {
+        'type': 'jockey',
+        'tier': tier,
+        'amount': amount,
+        'name': state.jockeys[tier].name,
+      };
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>>? openNadirJockeyChest10xDiamonds() {
+    const cost = 500;
+    if (state.diamonds >= cost) {
+      state = state.copyWith(diamonds: state.diamonds - cost);
+      final rand = math.Random();
+      final List<Map<String, dynamic>> drops = [];
+      final Map<int, int> tierDrops = {};
+      for (int i = 0; i < 10; i++) {
+        final tier = rollRareJockeyChestDrop(rand);
+        tierDrops[tier] = (tierDrops[tier] ?? 0) + 3;
+      }
+      tierDrops.forEach((tier, amount) {
+        addJockeyFragments(tier, amount);
+        drops.add({
+          'type': 'jockey',
+          'tier': tier,
+          'amount': amount,
+          'name': state.jockeys[tier].name,
         });
       });
       return drops;
@@ -1570,6 +1823,36 @@ class GameNotifier extends Notifier<GameStateModel> {
       winChance: newWinChance,
       lastSaved: _currentTrustedTime,
     );
+  }
+
+  bool renameHorse(int tier, String newName) {
+    if (tier < 0 || tier >= state.horses.length) return false;
+    final oldHorse = state.horses[tier];
+    final updatedHorse = oldHorse.copyWith(name: newName);
+
+    final newHorses = List<HorseAsset>.from(state.horses);
+    newHorses[tier] = updatedHorse;
+
+    state = state.copyWith(
+      horses: newHorses,
+      lastSaved: _currentTrustedTime,
+    );
+    return true;
+  }
+
+  bool renameJockey(int tier, String newName) {
+    if (tier < 0 || tier >= state.jockeys.length) return false;
+    final oldJockey = state.jockeys[tier];
+    final updatedJockey = oldJockey.copyWith(name: newName);
+
+    final newJockeys = List<JockeyAsset>.from(state.jockeys);
+    newJockeys[tier] = updatedJockey;
+
+    state = state.copyWith(
+      jockeys: newJockeys,
+      lastSaved: _currentTrustedTime,
+    );
+    return true;
   }
 
   bool upgradeBuilding(String buildingId) {
@@ -2181,7 +2464,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     int classIdx = 0,
   }) {
     if (tier >= horses.length || tier >= jockeys.length) {
-      return 0.12;
+      return 0.0;
     }
     final activeHorse = horses[tier];
     final activeJockey = jockeys[tier];
@@ -2237,7 +2520,7 @@ class GameNotifier extends Notifier<GameStateModel> {
     }
     double P = math.max(1.0, totalPower.toDouble());
     double winRate = 95.0 + 83.0 * (math.log(P / L) / math.ln10);
-    double baseWinChance = winRate.clamp(12.0, 95.0) / 100.0;
+    double baseWinChance = winRate.clamp(0.0, 95.0) / 100.0;
 
     // Calculate equipment contribution
     double equipmentBonus = 0.0;
@@ -2249,7 +2532,15 @@ class GameNotifier extends Notifier<GameStateModel> {
     });
 
     double winChance = baseWinChance + equipmentBonus;
-    return winChance.clamp(0.01, 0.99);
+    return winChance.clamp(0.0, 0.99);
+  }
+
+  static double getBuildingMilestoneMultiplier(int level) {
+    if (level >= 100) return 25.0;
+    if (level >= 50) return 10.0;
+    if (level >= 25) return 4.0;
+    if (level >= 10) return 2.0;
+    return 1.0;
   }
 
   double _calculateGoldPerSecond(Map<String, int> buildings) {
@@ -2260,11 +2551,11 @@ class GameNotifier extends Notifier<GameStateModel> {
     final labLevel = buildings['research_lab'] ?? 0;
     final stableLevel = buildings['luxury_stable'] ?? 0;
 
-    total += trackLevel * 1.0;
-    total += medicalLevel * 3.0;
-    total += storageLevel * 6.0;
-    total += labLevel * 12.0;
-    total += stableLevel * 24.0;
+    total += trackLevel * 1.0 * getBuildingMilestoneMultiplier(trackLevel);
+    total += medicalLevel * 3.5 * getBuildingMilestoneMultiplier(medicalLevel);
+    total += storageLevel * 15.0 * getBuildingMilestoneMultiplier(storageLevel);
+    total += labLevel * 70.0 * getBuildingMilestoneMultiplier(labLevel);
+    total += stableLevel * 300.0 * getBuildingMilestoneMultiplier(stableLevel);
 
     return total;
   }

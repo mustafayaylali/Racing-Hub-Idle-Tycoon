@@ -659,6 +659,8 @@ class GameStateModel {
   final int currentClassIndex;
   final bool sponsorActive;
   final double sponsorPosition;
+  final bool sponsorIsMega;
+  final int sponsorCooldown;
   final String raceState; // 'racing' or 'results'
   final int resultsCountdown;
   final int lastRacePlacement;
@@ -703,6 +705,8 @@ class GameStateModel {
     required this.currentClassIndex,
     required this.sponsorActive,
     required this.sponsorPosition,
+    required this.sponsorIsMega,
+    required this.sponsorCooldown,
     required this.raceState,
     required this.resultsCountdown,
     required this.lastRacePlacement,
@@ -949,6 +953,8 @@ class GameStateModel {
       currentClassIndex: 0,
       sponsorActive: false,
       sponsorPosition: 1.0,
+      sponsorIsMega: false,
+      sponsorCooldown: 0,
       raceState: 'racing',
       resultsCountdown: 0,
       lastRacePlacement: 1,
@@ -997,6 +1003,8 @@ class GameStateModel {
     int? currentClassIndex,
     bool? sponsorActive,
     double? sponsorPosition,
+    bool? sponsorIsMega,
+    int? sponsorCooldown,
     String? raceState,
     int? resultsCountdown,
     int? lastRacePlacement,
@@ -1043,6 +1051,8 @@ class GameStateModel {
       currentClassIndex: currentClassIndex ?? this.currentClassIndex,
       sponsorActive: sponsorActive ?? this.sponsorActive,
       sponsorPosition: sponsorPosition ?? this.sponsorPosition,
+      sponsorIsMega: sponsorIsMega ?? this.sponsorIsMega,
+      sponsorCooldown: sponsorCooldown ?? this.sponsorCooldown,
       raceState: raceState ?? this.raceState,
       resultsCountdown: resultsCountdown ?? this.resultsCountdown,
       lastRacePlacement: lastRacePlacement ?? this.lastRacePlacement,
@@ -1092,6 +1102,8 @@ class GameStateModel {
       'currentClassIndex': currentClassIndex,
       'sponsorActive': sponsorActive,
       'sponsorPosition': sponsorPosition,
+      'sponsorIsMega': sponsorIsMega,
+      'sponsorCooldown': sponsorCooldown,
       'raceState': raceState,
       'resultsCountdown': resultsCountdown,
       'lastRacePlacement': lastRacePlacement,
@@ -1183,6 +1195,8 @@ class GameStateModel {
       currentClassIndex: (json['currentClassIndex'] as num?)?.toInt() ?? 0,
       sponsorActive: json['sponsorActive'] as bool? ?? false,
       sponsorPosition: (json['sponsorPosition'] as num?)?.toDouble() ?? 1.0,
+      sponsorIsMega: json['sponsorIsMega'] as bool? ?? false,
+      sponsorCooldown: (json['sponsorCooldown'] as num?)?.toInt() ?? 0,
       raceState: json['raceState'] as String? ?? 'racing',
       resultsCountdown: (json['resultsCountdown'] as num?)?.toInt() ?? 0,
       lastRacePlacement: (json['lastRacePlacement'] as num?)?.toInt() ?? 1,
